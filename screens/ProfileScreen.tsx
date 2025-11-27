@@ -1,13 +1,16 @@
-import { useState } from "react";
-import { StyleSheet, View, TextInput } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, StyleSheet, TextInput, Alert, Pressable } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { ScreenKeyboardAwareScrollView } from "@/components/ScreenKeyboardAwareScrollView";
 import { ThemedText } from "@/components/ThemedText";
-import { Button } from "@/components/Button";
+import Spacer from "@/components/Spacer";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
-import Spacer from "@/components/Spacer";
+import { storage } from "@/utils/storage";
+import { UserSettings } from "@/types";
 import type { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 
 type ProfileScreenProps = {
@@ -16,13 +19,70 @@ type ProfileScreenProps = {
 
 export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const { theme, isDark } = useTheme();
+  const [settings, setSettings] = useState<UserSettings>({
+    name: "",
+    companyName: "",
+    location: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [stats, setStats] = useState({
+    totalPlants: 0,
+    totalActivities: 0,
+    benchesWithPlants: 0,
+  });
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  useFocusEffect(
+    useCallback(() => {
+      const loadData = async () => {
+        const [savedSettings, statsData] = await Promise.all([
+          storage.getSettings(),
+          storage.getStats(),
+        ]);
+        setSettings(savedSettings);
+        setStats({
+          totalPlants: statsData.totalPlants,
+          totalActivities: statsData.recentActivities.length,
+          benchesWithPlants: statsData.benchesWithPlants,
+        });
+      };
+      loadData();
+    }, [])
+  );
 
-  const handleSubmit = () => {
-    console.log("Form submitted:", { name, email, password });
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await storage.saveSettings(settings);
+      Alert.alert("Salvato", "Le impostazioni sono state salvate con successo");
+    } catch (error) {
+      Alert.alert("Errore", "Impossibile salvare le impostazioni");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleClearData = () => {
+    Alert.alert(
+      "Cancella Tutti i Dati",
+      "Questa azione cancellera tutti i dati salvati nell'app. Sei sicuro?",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Cancella",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await storage.clearAllData();
+              setSettings({ name: "", companyName: "", location: "" });
+              setStats({ totalPlants: 0, totalActivities: 0, benchesWithPlants: 0 });
+              Alert.alert("Completato", "Tutti i dati sono stati cancellati");
+            } catch (error) {
+              Alert.alert("Errore", "Impossibile cancellare i dati");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const inputStyle = [
@@ -35,148 +95,180 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
   return (
     <ScreenKeyboardAwareScrollView>
-      <View style={styles.section}>
-        <ThemedText type="h1">Heading 1</ThemedText>
-        <ThemedText type="small" style={styles.meta}>
-          32px • Bold
-        </ThemedText>
+      <View style={[styles.statsCard, { backgroundColor: theme.backgroundDefault }]}>
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <ThemedText type="h2" style={{ color: theme.primary }}>
+              {stats.totalPlants}
+            </ThemedText>
+            <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+              Piante
+            </ThemedText>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: theme.backgroundSecondary }]} />
+          <View style={styles.statItem}>
+            <ThemedText type="h2" style={{ color: theme.activityWatering }}>
+              {stats.benchesWithPlants}
+            </ThemedText>
+            <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+              Bancali
+            </ThemedText>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: theme.backgroundSecondary }]} />
+          <View style={styles.statItem}>
+            <ThemedText type="h2" style={{ color: theme.activityTreatment }}>
+              3
+            </ThemedText>
+            <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+              Serre
+            </ThemedText>
+          </View>
+        </View>
       </View>
-
-      <View style={styles.section}>
-        <ThemedText type="h2">Heading 2</ThemedText>
-        <ThemedText type="small" style={styles.meta}>
-          28px • Bold
-        </ThemedText>
-      </View>
-
-      <View style={styles.section}>
-        <ThemedText type="h3">Heading 3</ThemedText>
-        <ThemedText type="small" style={styles.meta}>
-          24px • Semi-Bold
-        </ThemedText>
-      </View>
-
-      <View style={styles.section}>
-        <ThemedText type="h4">Heading 4</ThemedText>
-        <ThemedText type="small" style={styles.meta}>
-          20px • Semi-Bold
-        </ThemedText>
-      </View>
-
-      <View style={styles.section}>
-        <ThemedText type="body">
-          Body text - This is the default text style for paragraphs and general
-          content.
-        </ThemedText>
-        <ThemedText type="small" style={styles.meta}>
-          16px • Regular
-        </ThemedText>
-      </View>
-
-      <View style={styles.section}>
-        <ThemedText type="small">
-          Small text - Used for captions, labels, and secondary information.
-        </ThemedText>
-        <ThemedText type="small" style={styles.meta}>
-          14px • Regular
-        </ThemedText>
-      </View>
-
-      <View style={styles.section}>
-        <ThemedText type="link">Link text - Interactive elements</ThemedText>
-        <ThemedText type="small" style={styles.meta}>
-          16px • Regular • Colored
-        </ThemedText>
-      </View>
-
-      <Spacer height={Spacing["4xl"]} />
-
-      <View style={styles.fieldContainer}>
-        <ThemedText type="small" style={styles.label}>
-          Name
-        </ThemedText>
-        <TextInput
-          style={inputStyle}
-          value={name}
-          onChangeText={setName}
-          placeholder="Enter your name"
-          placeholderTextColor={isDark ? "#9BA1A6" : "#687076"}
-          autoCapitalize="words"
-          returnKeyType="next"
-        />
-      </View>
-
-      <Spacer height={Spacing.lg} />
-
-      <View style={styles.fieldContainer}>
-        <ThemedText type="small" style={styles.label}>
-          Email
-        </ThemedText>
-        <TextInput
-          style={inputStyle}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="your.email@example.com"
-          placeholderTextColor={isDark ? "#9BA1A6" : "#687076"}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          returnKeyType="next"
-        />
-      </View>
-
-      <Spacer height={Spacing.lg} />
-
-      <View style={styles.fieldContainer}>
-        <ThemedText type="small" style={styles.label}>
-          Password
-        </ThemedText>
-        <TextInput
-          style={inputStyle}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Enter a password"
-          placeholderTextColor={isDark ? "#9BA1A6" : "#687076"}
-          secureTextEntry
-          autoCapitalize="none"
-          returnKeyType="next"
-        />
-      </View>
-
-      <Spacer height={Spacing.lg} />
-
-      <Button onPress={handleSubmit}>Submit Form</Button>
 
       <Spacer height={Spacing["2xl"]} />
 
-      <ThemedText type="h3" style={styles.sectionTitle}>
-        Testing
+      <ThemedText type="h4" style={styles.sectionTitle}>
+        Informazioni Azienda
       </ThemedText>
-      <Spacer height={Spacing.md} />
-      <Button
-        onPress={() => navigation.navigate("Crash")}
-        style={styles.crashButton}
+
+      <Spacer height={Spacing.lg} />
+
+      <View style={styles.fieldContainer}>
+        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+          Nome Responsabile
+        </ThemedText>
+        <TextInput
+          style={inputStyle}
+          value={settings.name}
+          onChangeText={(text) => setSettings({ ...settings, name: text })}
+          placeholder="Inserisci il tuo nome"
+          placeholderTextColor={theme.textSecondary}
+          autoCapitalize="words"
+        />
+      </View>
+
+      <Spacer height={Spacing.lg} />
+
+      <View style={styles.fieldContainer}>
+        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+          Nome Azienda
+        </ThemedText>
+        <TextInput
+          style={inputStyle}
+          value={settings.companyName}
+          onChangeText={(text) => setSettings({ ...settings, companyName: text })}
+          placeholder="Nome della tua azienda"
+          placeholderTextColor={theme.textSecondary}
+          autoCapitalize="words"
+        />
+      </View>
+
+      <Spacer height={Spacing.lg} />
+
+      <View style={styles.fieldContainer}>
+        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+          Localita
+        </ThemedText>
+        <TextInput
+          style={inputStyle}
+          value={settings.location}
+          onChangeText={(text) => setSettings({ ...settings, location: text })}
+          placeholder="Dove si trova l'azienda"
+          placeholderTextColor={theme.textSecondary}
+          autoCapitalize="words"
+        />
+      </View>
+
+      <Spacer height={Spacing["2xl"]} />
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.saveButton,
+          {
+            backgroundColor: theme.primary,
+            opacity: pressed || saving ? 0.8 : 1,
+          },
+        ]}
+        onPress={handleSave}
+        disabled={saving}
       >
-        Crash App
-      </Button>
+        <Feather name="save" size={20} color="#FFFFFF" />
+        <ThemedText style={styles.saveButtonText}>
+          {saving ? "Salvataggio..." : "Salva Impostazioni"}
+        </ThemedText>
+      </Pressable>
+
+      <Spacer height={Spacing["3xl"]} />
+
+      <ThemedText type="h4" style={styles.sectionTitle}>
+        Gestione Dati
+      </ThemedText>
+
+      <Spacer height={Spacing.lg} />
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.dangerButton,
+          {
+            backgroundColor: theme.backgroundDefault,
+            borderColor: theme.error,
+            opacity: pressed ? 0.8 : 1,
+          },
+        ]}
+        onPress={handleClearData}
+      >
+        <Feather name="trash-2" size={20} color={theme.error} />
+        <ThemedText style={[styles.dangerButtonText, { color: theme.error }]}>
+          Cancella Tutti i Dati
+        </ThemedText>
+      </Pressable>
+
+      <Spacer height={Spacing["2xl"]} />
+
+      <View style={[styles.infoCard, { backgroundColor: theme.backgroundDefault }]}>
+        <Feather name="info" size={20} color={theme.textSecondary} />
+        <View style={styles.infoText}>
+          <ThemedText style={{ color: theme.textSecondary, fontSize: 14 }}>
+            SerraManager v1.0.0
+          </ThemedText>
+          <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+            Gestione serre per coltivazione Proteaceae
+          </ThemedText>
+        </View>
+      </View>
+
+      <Spacer height={Spacing["2xl"]} />
     </ScreenKeyboardAwareScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  section: {
-    marginBottom: Spacing["3xl"],
+  statsCard: {
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
   },
-  meta: {
-    opacity: 0.5,
-    marginTop: Spacing.sm,
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+  },
+  sectionTitle: {
+    marginBottom: Spacing.xs,
   },
   fieldContainer: {
     width: "100%",
   },
   label: {
     marginBottom: Spacing.sm,
-    fontWeight: "600",
-    opacity: 0.8,
+    fontSize: 14,
   },
   input: {
     height: Spacing.inputHeight,
@@ -185,10 +277,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     fontSize: Typography.body.fontSize,
   },
-  sectionTitle: {
-    marginTop: Spacing.xl,
+  saveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
   },
-  crashButton: {
-    backgroundColor: "#FF3B30",
+  saveButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  dangerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  dangerButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  infoCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.md,
+  },
+  infoText: {
+    flex: 1,
   },
 });

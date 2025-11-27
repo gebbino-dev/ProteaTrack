@@ -1,30 +1,50 @@
 import { Platform } from "react-native";
 
-const tintColorLight = "#007AFF";
-const tintColorDark = "#0A84FF";
+const primaryGreen = "#2D7A3E";
+const primaryGreenDark = "#3D9A4E";
 
 export const Colors = {
   light: {
-    text: "#11181C",
+    text: "#1A1A1A",
+    textSecondary: "#666666",
     buttonText: "#FFFFFF",
     tabIconDefault: "#687076",
-    tabIconSelected: tintColorLight,
-    link: "#007AFF",
-    backgroundRoot: "#FFFFFF", // Elevation 0
-    backgroundDefault: "#F2F2F2", // Elevation 1
-    backgroundSecondary: "#E6E6E6", // Elevation 2
-    backgroundTertiary: "#D9D9D9", // Elevation 3
+    tabIconSelected: primaryGreen,
+    link: primaryGreen,
+    primary: primaryGreen,
+    backgroundRoot: "#F5F5F0",
+    backgroundDefault: "#FFFFFF",
+    backgroundSecondary: "#E8E8E3",
+    backgroundTertiary: "#D9D9D4",
+    success: "#4CAF50",
+    warning: "#FF9800",
+    error: "#E53935",
+    activityWatering: "#2196F3",
+    activityFertilizing: "#8B4513",
+    activityPruning: "#FF9800",
+    activityTreatment: "#9C27B0",
+    activityOther: "#607D8B",
   },
   dark: {
     text: "#ECEDEE",
+    textSecondary: "#9BA1A6",
     buttonText: "#FFFFFF",
     tabIconDefault: "#9BA1A6",
-    tabIconSelected: tintColorDark,
-    link: "#0A84FF",
-    backgroundRoot: "#1F2123", // Elevation 0
-    backgroundDefault: "#2A2C2E", // Elevation 1
-    backgroundSecondary: "#353739", // Elevation 2
-    backgroundTertiary: "#404244", // Elevation 3
+    tabIconSelected: primaryGreenDark,
+    link: primaryGreenDark,
+    primary: primaryGreenDark,
+    backgroundRoot: "#1A1D1A",
+    backgroundDefault: "#252825",
+    backgroundSecondary: "#303530",
+    backgroundTertiary: "#3B403B",
+    success: "#66BB6A",
+    warning: "#FFB74D",
+    error: "#EF5350",
+    activityWatering: "#42A5F5",
+    activityFertilizing: "#A0522D",
+    activityPruning: "#FFB74D",
+    activityTreatment: "#AB47BC",
+    activityOther: "#78909C",
   },
 };
 
@@ -93,13 +113,9 @@ export const Typography = {
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: "system-ui",
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: "ui-serif",
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: "ui-rounded",
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: "ui-monospace",
   },
   default: {
@@ -116,3 +132,11 @@ export const Fonts = Platform.select({
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
   },
 });
+
+export const ActivityColors = {
+  innaffiatura: Colors.light.activityWatering,
+  concimazione: Colors.light.activityFertilizing,
+  potatura: Colors.light.activityPruning,
+  trattamento: Colors.light.activityTreatment,
+  altro: Colors.light.activityOther,
+};
