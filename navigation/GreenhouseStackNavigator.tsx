@@ -56,7 +56,7 @@ export default function GreenhouseStackNavigator() {
         name="RecordActivity"
         component={RecordActivityScreen}
         options={{
-          headerTitle: "Registra Attivita",
+          headerTitle: "Registra Attività",
           presentation: "modal",
         }}
       />

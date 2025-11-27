@@ -98,11 +98,23 @@ export const storage = {
     }
   },
 
-  async getBench(greenhouse: number, sector: number, benchNumber: string): Promise<Bench | null> {
+  async getBench(greenhouse: number, sector: number, benchNumber: string): Promise<Bench> {
+    await this.initializeBenches();
     const benches = await this.getBenches();
-    return benches.find(
+    const found = benches.find(
       b => b.greenhouse === greenhouse && b.sector === sector && b.benchNumber === benchNumber
-    ) || null;
+    );
+    if (found) return found;
+    return {
+      id: generateId(),
+      greenhouse,
+      sector,
+      benchNumber,
+      plantCount: 0,
+      variety: '',
+      plantingDate: '',
+      notes: '',
+    };
   },
 
   async getSettings(): Promise<UserSettings> {

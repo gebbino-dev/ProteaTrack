@@ -53,8 +53,8 @@ export default function BenchDetailScreen({ navigation, route }: BenchDetailScre
 
   const handleDeleteActivity = async (activityId: string) => {
     Alert.alert(
-      "Elimina Attivita",
-      "Sei sicuro di voler eliminare questa attivita?",
+      "Elimina Attività",
+      "Sei sicuro di voler eliminare questa attività?",
       [
         { text: "Annulla", style: "cancel" },
         {
@@ -128,7 +128,7 @@ export default function BenchDetailScreen({ navigation, route }: BenchDetailScre
               <Feather name="tag" size={20} color={theme.activityTreatment} />
               <View style={styles.infoText}>
                 <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
-                  Varieta
+                  Varietà
                 </ThemedText>
                 <ThemedText type="body" numberOfLines={1}>
                   {benchData?.variety || "Non specificata"}
@@ -164,9 +164,9 @@ export default function BenchDetailScreen({ navigation, route }: BenchDetailScre
         <Spacer height={Spacing["2xl"]} />
 
         <View style={styles.sectionHeader}>
-          <ThemedText type="h4">Storico Attivita</ThemedText>
+          <ThemedText type="h4">Storico Attività</ThemedText>
           <ThemedText style={{ color: theme.textSecondary }}>
-            {activities.length} attivita
+            {activities.length} attività
           </ThemedText>
         </View>
 
@@ -179,7 +179,7 @@ export default function BenchDetailScreen({ navigation, route }: BenchDetailScre
             <Feather name="clipboard" size={40} color={theme.tabIconDefault} />
             <Spacer height={Spacing.md} />
             <ThemedText style={{ textAlign: "center" }}>
-              Nessuna attivita registrata per questo bancale
+              Nessuna attività registrata per questo bancale
             </ThemedText>
           </View>
         ) : (

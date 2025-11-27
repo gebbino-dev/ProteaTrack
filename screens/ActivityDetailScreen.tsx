@@ -54,8 +54,8 @@ export default function ActivityDetailScreen({ navigation, route }: ActivityDeta
 
   const handleDelete = () => {
     Alert.alert(
-      "Elimina Attivita",
-      "Sei sicuro di voler eliminare questa attivita?",
+      "Elimina Attività",
+      "Sei sicuro di voler eliminare questa attività?",
       [
         { text: "Annulla", style: "cancel" },
         {
@@ -175,7 +175,7 @@ export default function ActivityDetailScreen({ navigation, route }: ActivityDeta
       <Spacer height={Spacing["2xl"]} />
 
       <Button onPress={handleDelete} style={{ backgroundColor: theme.error }}>
-        Elimina Attivita
+        Elimina Attività
       </Button>
     </ScreenScrollView>
   );

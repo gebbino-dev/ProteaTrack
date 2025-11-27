@@ -64,7 +64,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const handleClearData = () => {
     Alert.alert(
       "Cancella Tutti i Dati",
-      "Questa azione cancellera tutti i dati salvati nell'app. Sei sicuro?",
+      "Questa azione cancellerà tutti i dati salvati nell'app. Sei sicuro?",
       [
         { text: "Annulla", style: "cancel" },
         {
@@ -168,7 +168,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
       <View style={styles.fieldContainer}>
         <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
-          Localita
+          Località
         </ThemedText>
         <TextInput
           style={inputStyle}

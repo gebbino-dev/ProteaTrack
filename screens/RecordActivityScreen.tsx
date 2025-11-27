@@ -67,7 +67,7 @@ export default function RecordActivityScreen({
       });
       navigation.goBack();
     } catch (error) {
-      Alert.alert("Errore", "Impossibile salvare l'attivita. Riprova.");
+      Alert.alert("Errore", "Impossibile salvare l'attività. Riprova.");
       console.error("Error saving activity:", error);
     } finally {
       setSaving(false);
@@ -92,13 +92,13 @@ export default function RecordActivityScreen({
   return (
     <ScreenKeyboardAwareScrollView>
       <ThemedText type="body" style={{ color: theme.textSecondary }}>
-        Registra una nuova attivita per un bancale specifico
+        Registra una nuova attività per un bancale specifico
       </ThemedText>
 
       <Spacer height={Spacing["2xl"]} />
 
       <ThemedText type="h4" style={styles.sectionTitle}>
-        Tipo di Attivita
+        Tipo di Attività
       </ThemedText>
       <Spacer height={Spacing.md} />
 
@@ -244,7 +244,7 @@ export default function RecordActivityScreen({
             borderColor: theme.backgroundSecondary,
           },
         ]}
-        placeholder="Aggiungi note sull'attivita..."
+        placeholder="Aggiungi note sull'attività..."
         placeholderTextColor={theme.textSecondary}
         value={notes}
         onChangeText={setNotes}
@@ -268,7 +268,7 @@ export default function RecordActivityScreen({
       >
         <Feather name="check" size={20} color="#FFFFFF" />
         <ThemedText style={styles.saveButtonText}>
-          {saving ? "Salvataggio..." : "Salva Attivita"}
+          {saving ? "Salvataggio..." : "Salva Attività"}
         </ThemedText>
       </Pressable>
 

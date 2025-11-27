@@ -81,7 +81,7 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
           <StatCard
             icon="activity"
             value={stats.todayActivities.toString()}
-            label="Attivita Oggi"
+            label="Attività Oggi"
             color={theme.activityWatering}
           />
         </View>
@@ -106,7 +106,7 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
         <Spacer height={Spacing["2xl"]} />
 
         <ThemedText type="h3" style={styles.sectionTitle}>
-          Attivita Recenti
+          Attività Recenti
         </ThemedText>
         <Spacer height={Spacing.md} />
 
@@ -124,12 +124,12 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
               style={styles.emptyIcon}
             />
             <ThemedText style={styles.emptyText}>
-              Nessuna attivita registrata
+              Nessuna attività registrata
             </ThemedText>
             <ThemedText
               style={[styles.emptySubtext, { color: theme.textSecondary }]}
             >
-              Premi il pulsante + per registrare la prima attivita
+              Premi il pulsante + per registrare la prima attività
             </ThemedText>
           </View>
         ) : (

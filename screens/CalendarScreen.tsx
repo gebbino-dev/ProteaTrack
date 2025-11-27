@@ -275,7 +275,7 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
               })}
             </ThemedText>
             <ThemedText style={{ color: theme.textSecondary }}>
-              {filteredActivities.length} attivita
+              {filteredActivities.length} attività
             </ThemedText>
           </View>
         }
@@ -291,7 +291,7 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
             <Feather name="calendar" size={40} color={theme.tabIconDefault} />
             <Spacer height={Spacing.md} />
             <ThemedText style={{ textAlign: "center" }}>
-              Nessuna attivita per questa data
+              Nessuna attività per questa data
             </ThemedText>
           </View>
         }

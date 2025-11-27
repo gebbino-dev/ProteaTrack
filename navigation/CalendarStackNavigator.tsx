@@ -32,7 +32,7 @@ export default function CalendarStackNavigator() {
         name="ActivityDetail"
         component={ActivityDetailScreen}
         options={{
-          headerTitle: "Dettaglio Attivita",
+          headerTitle: "Dettaglio Attività",
         }}
       />
     </Stack.Navigator>

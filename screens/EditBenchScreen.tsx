@@ -122,7 +122,7 @@ export default function EditBenchScreen({ navigation, route }: EditBenchScreenPr
       <Spacer height={Spacing["2xl"]} />
 
       <ThemedText type="h4" style={styles.sectionTitle}>
-        Varieta
+        Varietà
       </ThemedText>
       <Spacer height={Spacing.md} />
       <Pressable
@@ -137,7 +137,7 @@ export default function EditBenchScreen({ navigation, route }: EditBenchScreenPr
         onPress={() => setShowVarietyPicker(!showVarietyPicker)}
       >
         <ThemedText style={variety ? {} : { color: theme.textSecondary }}>
-          {variety || "Seleziona varieta"}
+          {variety || "Seleziona varietà"}
         </ThemedText>
         <Feather
           name={showVarietyPicker ? "chevron-up" : "chevron-down"}

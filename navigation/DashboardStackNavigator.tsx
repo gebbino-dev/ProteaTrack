@@ -37,7 +37,7 @@ export default function DashboardStackNavigator() {
         name="RecordActivity"
         component={RecordActivityScreen}
         options={{
-          headerTitle: "Registra Attivita",
+          headerTitle: "Registra Attività",
           presentation: "modal",
         }}
       />
