@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Activity, Bench, UserSettings, SECTORS_PER_GREENHOUSE, BENCHES } from '@/types';
+import { Activity, Bench, UserSettings, GreenhouseConfig, DEFAULT_GREENHOUSE_CONFIG } from '@/types';
 
 const KEYS = {
   ACTIVITIES: 'serra_activities',
   BENCHES: 'serra_benches',
   SETTINGS: 'serra_settings',
+  GREENHOUSE_CONFIG: 'serra_greenhouse_config',
 };
 
 export const generateId = (): string => {
@@ -184,19 +185,41 @@ export const storage = {
     };
   },
 
+  async getGreenhouseConfig(): Promise<GreenhouseConfig> {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.GREENHOUSE_CONFIG);
+      return data ? JSON.parse(data) : DEFAULT_GREENHOUSE_CONFIG;
+    } catch (error) {
+      console.error('Error getting greenhouse config:', error);
+      return DEFAULT_GREENHOUSE_CONFIG;
+    }
+  },
+
+  async saveGreenhouseConfig(config: GreenhouseConfig): Promise<void> {
+    try {
+      await AsyncStorage.setItem(KEYS.GREENHOUSE_CONFIG, JSON.stringify(config));
+    } catch (error) {
+      console.error('Error saving greenhouse config:', error);
+      throw error;
+    }
+  },
+
   async initializeBenches(): Promise<void> {
     const existingBenches = await this.getBenches();
     if (existingBenches.length > 0) return;
 
+    const config = await this.getGreenhouseConfig();
     const benches: Bench[] = [];
-    for (const [greenhouse, sectors] of Object.entries(SECTORS_PER_GREENHOUSE)) {
-      for (const sector of sectors) {
-        for (const benchNumber of BENCHES) {
+    
+    for (const greenhouse of config.greenhouses) {
+      for (const sector of greenhouse.sectors) {
+        const benchNames = greenhouse.benchNames || Array.from({ length: greenhouse.benchCount }, (_, i) => `B${i + 1}`);
+        for (const benchName of benchNames) {
           benches.push({
             id: generateId(),
-            greenhouse: parseInt(greenhouse),
-            sector,
-            benchNumber,
+            greenhouse: greenhouse.id,
+            sector: sector.id,
+            benchNumber: benchName,
             plantCount: 0,
             variety: '',
             plantingDate: '',

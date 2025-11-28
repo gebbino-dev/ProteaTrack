@@ -202,6 +202,30 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       <Spacer height={Spacing["3xl"]} />
 
       <ThemedText type="h4" style={styles.sectionTitle}>
+        Configurazione Serre
+      </ThemedText>
+
+      <Spacer height={Spacing.lg} />
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.saveButton,
+          {
+            backgroundColor: theme.primary,
+            opacity: pressed ? 0.8 : 1,
+          },
+        ]}
+        onPress={() => navigation.navigate("Profile")}
+      >
+        <Feather name="settings" size={20} color="#FFFFFF" />
+        <ThemedText style={styles.saveButtonText}>
+          Configura Struttura Serre
+        </ThemedText>
+      </Pressable>
+
+      <Spacer height={Spacing["3xl"]} />
+
+      <ThemedText type="h4" style={styles.sectionTitle}>
         Gestione Dati
       </ThemedText>
 
