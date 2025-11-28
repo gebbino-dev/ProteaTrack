@@ -99,16 +99,28 @@ export default function BenchDetailScreen({ navigation, route }: BenchDetailScre
                 Bancale {bench}
               </ThemedText>
             </View>
-            <Pressable
-              style={({ pressed }) => [
-                styles.editButton,
-                { backgroundColor: theme.backgroundSecondary },
-                pressed && { opacity: 0.7 },
-              ]}
-              onPress={() => navigation.navigate("EditBench", { greenhouse, sector, bench })}
-            >
-              <Feather name="edit-2" size={18} color={theme.text} />
-            </Pressable>
+            <View style={styles.headerButtons}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.editButton,
+                  { backgroundColor: theme.backgroundSecondary },
+                  pressed && { opacity: 0.7 },
+                ]}
+                onPress={() => navigation.navigate("EditBench", { greenhouse, sector, bench })}
+              >
+                <Feather name="edit-2" size={18} color={theme.text} />
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.editButton,
+                  { backgroundColor: theme.primary },
+                  pressed && { opacity: 0.7 },
+                ]}
+                onPress={() => navigation.navigate("EditBench", { greenhouse, sector, bench })}
+              >
+                <Feather name="plus" size={18} color="#FFFFFF" />
+              </Pressable>
+            </View>
           </View>
 
           <View style={[styles.divider, { backgroundColor: theme.backgroundSecondary }]} />
@@ -226,6 +238,11 @@ const styles = StyleSheet.create({
   infoHeader: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerButtons: {
+    flexDirection: "row",
+    gap: Spacing.sm,
   },
   iconContainer: {
     width: 48,

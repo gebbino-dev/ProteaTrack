@@ -50,6 +50,22 @@ export const storage = {
     }
   },
 
+  async updateActivity(id: string, updates: Partial<Activity>): Promise<Activity | null> {
+    try {
+      const activities = await this.getActivities();
+      const index = activities.findIndex(a => a.id === id);
+      if (index < 0) return null;
+      
+      const updated = { ...activities[index], ...updates };
+      activities[index] = updated;
+      await AsyncStorage.setItem(KEYS.ACTIVITIES, JSON.stringify(activities));
+      return updated;
+    } catch (error) {
+      console.error('Error updating activity:', error);
+      throw error;
+    }
+  },
+
   async getActivitiesForBench(greenhouse: number, sector: number, bench: string): Promise<Activity[]> {
     const activities = await this.getActivities();
     return activities.filter(

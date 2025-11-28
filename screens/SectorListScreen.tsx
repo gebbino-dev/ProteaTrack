@@ -24,11 +24,10 @@ export default function SectorListScreen({ navigation, route }: SectorListScreen
   const [benchData, setBenchData] = useState<Bench[]>([]);
 
   const sectors = SECTORS_PER_GREENHOUSE[greenhouse];
-  const arcades = [
-    { name: "Arcata 1", sectors: sectors.slice(0, 4) },
-    { name: "Arcata 2", sectors: sectors.slice(4, 8) },
-    { name: "Arcata 3", sectors: sectors.slice(8, 12) },
-  ];
+  const sectorGroups = [];
+  for (let i = 0; i < sectors.length; i += 3) {
+    sectorGroups.push(sectors.slice(i, i + 3));
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -49,16 +48,10 @@ export default function SectorListScreen({ navigation, route }: SectorListScreen
 
   return (
     <ScreenScrollView>
-      {arcades.map((arcade, arcadeIndex) => (
-        <View key={arcade.name} style={styles.arcadeSection}>
-          <View style={[styles.arcadeHeader, { backgroundColor: theme.primary }]}>
-            <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
-              {arcade.name}
-            </ThemedText>
-          </View>
-
+      {sectorGroups.map((group, groupIndex) => (
+        <View key={`group-${groupIndex}`} style={styles.groupSection}>
           <View style={styles.sectorsGrid}>
-            {arcade.sectors.map((sector) => {
+            {group.map((sector) => {
               const stats = getSectorStats(sector);
               return (
                 <View key={sector} style={styles.sectorWrapper}>
@@ -130,22 +123,16 @@ export default function SectorListScreen({ navigation, route }: SectorListScreen
 }
 
 const styles = StyleSheet.create({
-  arcadeSection: {
-    marginBottom: Spacing["2xl"],
-  },
-  arcadeHeader: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.sm,
-    marginBottom: Spacing.md,
-  },
   sectorsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     marginHorizontal: -Spacing.xs,
   },
+  groupSection: {
+    marginBottom: Spacing["2xl"],
+  },
   sectorWrapper: {
-    width: "50%",
+    width: "33.33%",
     padding: Spacing.xs,
   },
   sectorCard: {

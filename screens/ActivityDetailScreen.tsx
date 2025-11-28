@@ -172,7 +172,16 @@ export default function ActivityDetailScreen({ navigation, route }: ActivityDeta
         ) : null}
       </View>
 
-      <Spacer height={Spacing["2xl"]} />
+      <Spacer height={Spacing.lg} />
+
+      <Button
+        onPress={() => navigation.navigate("EditActivity", { activityId })}
+        style={{ backgroundColor: theme.primary }}
+      >
+        Modifica Attività
+      </Button>
+
+      <Spacer height={Spacing.md} />
 
       <Button onPress={handleDelete} style={{ backgroundColor: theme.error }}>
         Elimina Attività
