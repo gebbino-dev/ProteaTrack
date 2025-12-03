@@ -117,23 +117,15 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
     }
   };
 
-  const handleDeletePlant = (id: string) => {
-    Alert.alert("Rimuovi Pianta", "Sei sicuro?", [
-      { text: "Annulla", style: "cancel" },
-      {
-        text: "Rimuovi",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await storage.deletePlantRecord(id);
-            const updated = await storage.getPlantInventory();
-            setInventory(updated);
-          } catch (error) {
-            Alert.alert("Errore", "Impossibile rimuovere la pianta");
-          }
-        },
-      },
-    ]);
+  const handleDeletePlant = async (id: string) => {
+    try {
+      await storage.deletePlantRecord(id);
+      const updated = await storage.getPlantInventory();
+      setInventory(updated);
+      Alert.alert("Successo", "Pianta rimossa");
+    } catch (error) {
+      Alert.alert("Errore", "Impossibile rimuovere la pianta");
+    }
   };
 
   const handleExportData = async () => {
@@ -364,7 +356,16 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
                 </ThemedText>
               </View>
               <Pressable
-                onPress={() => handleDeletePlant(plant.id)}
+                onPress={() => {
+                  Alert.alert("Rimuovi", "Elimina questa pianta?", [
+                    { text: "No", style: "cancel" },
+                    {
+                      text: "Sì, elimina",
+                      style: "destructive",
+                      onPress: () => handleDeletePlant(plant.id),
+                    },
+                  ]);
+                }}
                 style={({ pressed }) => [
                   styles.deleteButton,
                   { opacity: pressed ? 0.6 : 1 },
