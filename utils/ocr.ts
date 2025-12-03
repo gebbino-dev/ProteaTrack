@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
 
 export interface ExtractedPlantData {
   variety?: string;
@@ -9,7 +10,6 @@ export interface ExtractedPlantData {
 
 /**
  * Estrae dati da immagine caricata
- * Legge il file e tenta il parsing dei testi comuni
  */
 export async function extractPlantDataFromImage(
   imageUri: string
@@ -17,22 +17,27 @@ export async function extractPlantDataFromImage(
   try {
     console.log('OCR: Inizio estrazione da', imageUri);
     
-    // Leggi l'immagine dal file system
+    // Su web, l'immagine è un blob URL che non può essere letto come file
+    // Ritorna vuoto così l'utente compila il form manualmente
+    if (Platform.OS === 'web' && imageUri.startsWith('blob:')) {
+      console.log('OCR: Blob URL su web, skip OCR');
+      return {
+        variety: undefined,
+        species: undefined,
+        quantity: undefined,
+        confidence: 0,
+      };
+    }
+    
+    // Su Android/iOS, leggi il file
     const base64 = await FileSystem.readAsStringAsync(imageUri, {
       encoding: FileSystem.EncodingType.Base64,
     });
     
     console.log('OCR: Immagine letta, inizio parsing...');
     
-    // Parsing manuale basato su pattern noti
-    const textPatterns = [
-      /SERRURIA\s*(?:,?\s*)?([^\d]*)?(\d+\.?\d*)/gi,
-      /PROTEA\s*(?:,?\s*)?([^\d]*)?(\d+\.?\d*)/gi,
-      /TELOPEA\s*(?:,?\s*)?([^\d]*)?(\d+\.?\d*)/gi,
-      /LEUCOSPERMUM\s*(?:,?\s*)?([^\d]*)?(\d+\.?\d*)/gi,
-      /LEUCADENDRON\s*(?:,?\s*)?([^\d]*)?(\d+\.?\d*)/gi,
-      /BANKSIA\s*(?:,?\s*)?([^\d]*)?(\d+\.?\d*)/gi,
-    ];
+    // Pattern semplice per generi comuni di Proteaceae
+    const varieties = ['Serruria', 'Protea', 'Telopea', 'Leucospermum', 'Leucadendron', 'Banksia'];
     
     let result: ExtractedPlantData = {
       variety: undefined,
@@ -41,44 +46,26 @@ export async function extractPlantDataFromImage(
       confidence: 0,
     };
     
-    // Estrai ogni varietà conosciuta dalla foto
-    for (const pattern of textPatterns) {
-      const matches = pattern.exec(base64);
-      if (matches) {
-        const varietyName = base64.substring(Math.max(0, matches.index - 50), matches.index).split('\n').pop()?.trim();
-        if (varietyName && !result.variety) {
-          result.variety = varietyName || matches[0].split(/\s+/)[0];
-          result.confidence += 0.3;
-        }
-        
-        if (matches[2] && !result.quantity) {
-          const qty = parseInt(matches[2].replace(/\./g, ''), 10);
-          if (qty > 0) {
-            result.quantity = qty;
-            result.confidence += 0.4;
-          }
-        }
+    // Tenta di trovare i dati dal testo decodificato
+    const textBytes = Buffer.from(base64, 'base64').toString('utf8', 0, Math.min(1000, Buffer.from(base64, 'base64').length));
+    
+    // Cerca varietà
+    for (const variety of varieties) {
+      if (textBytes.toLowerCase().includes(variety.toLowerCase())) {
+        result.variety = variety;
+        result.confidence += 0.3;
+        break;
       }
     }
     
-    // Se nulla è stato trovato, ritorna almeno con Proteaceae
-    if (!result.variety) {
-      // Cerca le specie comuni nel testo base64 (rappresentazione delle parole)
-      const varieties = [
-        'SERRURIA',
-        'PROTEA',
-        'TELOPEA',
-        'LEUCOSPERMUM',
-        'LEUCADENDRON',
-        'BANKSIA',
-      ];
-      
-      for (const variety of varieties) {
-        if (base64.includes(Buffer.from(variety).toString('base64'))) {
-          result.variety = variety + ' spp.';
-          result.confidence += 0.2;
-          break;
-        }
+    // Cerca numeri grandi che potrebbero essere quantità
+    const numberMatches = textBytes.match(/\b([1-9]\d{0,4})\b/g);
+    if (numberMatches && numberMatches.length > 0) {
+      const numbers = numberMatches.map(n => parseInt(n, 10));
+      const maxNumber = Math.max(...numbers);
+      if (maxNumber > 5 && maxNumber < 100000) {
+        result.quantity = maxNumber;
+        result.confidence += 0.3;
       }
     }
     
@@ -88,7 +75,6 @@ export async function extractPlantDataFromImage(
     
   } catch (error) {
     console.error('OCR Error:', error);
-    // Ritorna comunque un oggetto base64 valido
     return {
       variety: undefined,
       species: 'Proteaceae',
@@ -132,7 +118,6 @@ export function parseExtractedText(text: string): ExtractedPlantData {
   const numberMatches = text.match(/\b([1-9]\d{0,4})\b/g);
   if (numberMatches && numberMatches.length > 0) {
     const numbers = numberMatches.map(n => parseInt(n, 10));
-    // Prendi il numero più grande tra i primi risultati
     const maxNumber = Math.max(...numbers);
     if (maxNumber > 5 && maxNumber < 100000) {
       data.quantity = maxNumber;

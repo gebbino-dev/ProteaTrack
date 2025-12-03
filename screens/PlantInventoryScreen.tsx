@@ -98,12 +98,23 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
     setOcrLoading(true);
     try {
       const extractedData = await extractPlantDataFromImage(uri);
-      setOcrReviewData({
-        variety: extractedData.variety || "",
-        species: extractedData.species || "",
-        quantity: extractedData.quantity?.toString() || "",
-      });
-      setShowOcrReview(true);
+      
+      // Se OCR ha estratto dati, mostra la schermata di revisione
+      if (extractedData.variety || extractedData.quantity) {
+        setOcrReviewData({
+          variety: extractedData.variety || "",
+          species: extractedData.species || "",
+          quantity: extractedData.quantity?.toString() || "",
+        });
+        setShowOcrReview(true);
+      } else {
+        // Altrimenti, apri il form manuale diretto
+        setShowForm(true);
+        setFormData(prev => ({
+          ...prev,
+          species: extractedData.species || prev.species,
+        }));
+      }
     } catch (error) {
       Alert.alert("Errore", "Impossibile caricare l'immagine. Riprova.");
     } finally {
