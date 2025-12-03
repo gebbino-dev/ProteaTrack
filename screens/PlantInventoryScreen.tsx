@@ -36,6 +36,7 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
   const [showForm, setShowForm] = useState(false);
   const [showOcrReview, setShowOcrReview] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
+  
   const [formData, setFormData] = useState({
     variety: "",
     species: "",
@@ -43,6 +44,7 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
     arrivalDate: new Date().toISOString().split("T")[0],
     notes: "",
   });
+  
   const [ocrReviewData, setOcrReviewData] = useState({
     variety: "",
     species: "",
@@ -96,13 +98,11 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
     setOcrLoading(true);
     try {
       const extractedData = await extractPlantDataFromImage(uri);
-
       setOcrReviewData({
         variety: extractedData.variety || "",
         species: extractedData.species || "",
         quantity: extractedData.quantity?.toString() || "",
       });
-
       setShowOcrReview(true);
     } catch (error) {
       Alert.alert("Errore", "Impossibile caricare l'immagine. Riprova.");
@@ -211,7 +211,7 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
     },
   ];
 
-  // SCHERMATA DI REVISIONE OCR
+  // ===== SCHERMATA DI REVISIONE OCR =====
   if (showOcrReview) {
     return (
       <ScreenKeyboardAwareScrollView>
@@ -298,6 +298,7 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
     );
   }
 
+  // ===== SCHERMATA PRINCIPALE INVENTARIO =====
   return (
     <ScreenKeyboardAwareScrollView>
       <ThemedText type="h3" style={styles.title}>
