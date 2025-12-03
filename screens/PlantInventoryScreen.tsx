@@ -22,7 +22,6 @@ import Spacer from "@/components/Spacer";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { storage } from "@/utils/storage";
-import { extractPlantDataFromImage } from "@/utils/ocr";
 import { PlantRecord, PlantInventory } from "@/types";
 import { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 
@@ -34,8 +33,6 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
   const { theme } = useTheme();
   const [inventory, setInventory] = useState<PlantInventory>({ plants: [] });
   const [showForm, setShowForm] = useState(false);
-  const [showOcrReview, setShowOcrReview] = useState(false);
-  const [ocrLoading, setOcrLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     variety: "",
@@ -43,12 +40,6 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
     quantity: "0",
     arrivalDate: new Date().toISOString().split("T")[0],
     notes: "",
-  });
-  
-  const [ocrReviewData, setOcrReviewData] = useState({
-    variety: "",
-    species: "",
-    quantity: "",
   });
 
   useFocusEffect(
@@ -70,7 +61,8 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
       });
 
       if (!result.canceled && result.assets[0]) {
-        await extractDataFromDocument(result.assets[0].uri);
+        // Apri il form direttamente per compilare manualmente
+        setShowForm(true);
       }
     } catch (error) {
       Alert.alert("Errore", "Impossibile caricare l'immagine");
@@ -92,51 +84,6 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
     } catch (error) {
       Alert.alert("Errore", "Impossibile caricare il documento");
     }
-  };
-
-  const extractDataFromDocument = async (uri: string) => {
-    setOcrLoading(true);
-    try {
-      const extractedData = await extractPlantDataFromImage(uri);
-      
-      // Se OCR ha estratto dati, mostra la schermata di revisione
-      if (extractedData.variety || extractedData.quantity) {
-        setOcrReviewData({
-          variety: extractedData.variety || "",
-          species: extractedData.species || "",
-          quantity: extractedData.quantity?.toString() || "",
-        });
-        setShowOcrReview(true);
-      } else {
-        // Altrimenti, apri il form manuale diretto
-        setShowForm(true);
-        setFormData(prev => ({
-          ...prev,
-          species: extractedData.species || prev.species,
-        }));
-      }
-    } catch (error) {
-      Alert.alert("Errore", "Impossibile caricare l'immagine. Riprova.");
-    } finally {
-      setOcrLoading(false);
-    }
-  };
-
-  const handleOcrReviewConfirm = () => {
-    setFormData(prev => ({
-      ...prev,
-      variety: ocrReviewData.variety || prev.variety,
-      species: ocrReviewData.species || prev.species,
-      quantity: ocrReviewData.quantity || prev.quantity,
-    }));
-    setShowOcrReview(false);
-    setShowForm(true);
-    setOcrReviewData({ variety: "", species: "", quantity: "" });
-  };
-
-  const handleOcrReviewCancel = () => {
-    setShowOcrReview(false);
-    setOcrReviewData({ variety: "", species: "", quantity: "" });
   };
 
   const handleAddPlant = async () => {
@@ -222,93 +169,6 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
     },
   ];
 
-  // ===== SCHERMATA DI REVISIONE OCR =====
-  if (showOcrReview) {
-    return (
-      <ScreenKeyboardAwareScrollView>
-        <ThemedText type="h3" style={styles.title}>
-          Revisione Dati OCR
-        </ThemedText>
-
-        <Spacer height={Spacing.md} />
-
-        <ThemedText type="body" style={{ color: theme.textSecondary }}>
-          Verifica e modifica i dati estratti dalla foto, poi conferma
-        </ThemedText>
-
-        <Spacer height={Spacing.lg} />
-
-        <View style={[styles.formCard, { backgroundColor: theme.backgroundDefault }]}>
-          <ThemedText type="body" style={styles.formLabel}>
-            Varietà
-          </ThemedText>
-          <TextInput
-            style={inputStyle}
-            value={ocrReviewData.variety}
-            onChangeText={(text) =>
-              setOcrReviewData({ ...ocrReviewData, variety: text })
-            }
-            placeholder="Es. Leucospermum cordifolium"
-            placeholderTextColor={theme.textSecondary}
-          />
-
-          <ThemedText type="body" style={styles.formLabel}>
-            Specie
-          </ThemedText>
-          <TextInput
-            style={inputStyle}
-            value={ocrReviewData.species}
-            onChangeText={(text) =>
-              setOcrReviewData({ ...ocrReviewData, species: text })
-            }
-            placeholder="Es. Proteaceae"
-            placeholderTextColor={theme.textSecondary}
-          />
-
-          <ThemedText type="body" style={styles.formLabel}>
-            Numero Piante
-          </ThemedText>
-          <TextInput
-            style={inputStyle}
-            value={ocrReviewData.quantity}
-            onChangeText={(text) =>
-              setOcrReviewData({ ...ocrReviewData, quantity: text })
-            }
-            placeholder="0"
-            placeholderTextColor={theme.textSecondary}
-            keyboardType="number-pad"
-          />
-
-          <View style={styles.formButtons}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.formButton,
-                { backgroundColor: theme.primary, opacity: pressed ? 0.8 : 1 },
-              ]}
-              onPress={handleOcrReviewConfirm}
-            >
-              <ThemedText style={styles.formButtonText}>Conferma</ThemedText>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.formButton,
-                {
-                  backgroundColor: theme.backgroundSecondary,
-                  opacity: pressed ? 0.8 : 1,
-                },
-              ]}
-              onPress={handleOcrReviewCancel}
-            >
-              <ThemedText style={{ color: theme.text }}>Annulla</ThemedText>
-            </Pressable>
-          </View>
-        </View>
-
-        <Spacer height={Spacing["2xl"]} />
-      </ScreenKeyboardAwareScrollView>
-    );
-  }
-
   // ===== SCHERMATA PRINCIPALE INVENTARIO =====
   return (
     <ScreenKeyboardAwareScrollView>
@@ -340,7 +200,6 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
                 { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
               ]}
               onPress={handlePickImage}
-              disabled={ocrLoading}
             >
               <Feather name="camera" size={20} color={theme.text} />
               <ThemedText style={{ color: theme.text }}>Da Foto</ThemedText>
@@ -353,7 +212,6 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
                 { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
               ]}
               onPress={handlePickDocument}
-              disabled={ocrLoading}
             >
               <Feather name="file" size={20} color={theme.text} />
               <ThemedText style={{ color: theme.text }}>Da PDF</ThemedText>
@@ -459,14 +317,6 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
       )}
 
       <Spacer height={Spacing.lg} />
-
-      {ocrLoading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.primary} />
-          <Spacer height={Spacing.md} />
-          <ThemedText>Estrazione dati in corso...</ThemedText>
-        </View>
-      )}
 
       <ThemedText type="body" style={{ color: theme.textSecondary }}>
         Piante in inventario: {inventory.plants.length}
@@ -581,11 +431,6 @@ const styles = StyleSheet.create({
   },
   plantInfo: {
     flex: 1,
-  },
-  loadingContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing["2xl"],
   },
   exportButton: {
     flexDirection: "row",
