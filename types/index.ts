@@ -23,6 +23,21 @@ export interface Bench {
   variety: string;
   plantingDate: string;
   notes: string;
+  plaquette: number;
+}
+
+export interface PlantRecord {
+  id: string;
+  variety: string;
+  species?: string;
+  quantity: number;
+  arrivalDate: string;
+  sourceDocument?: string;
+  notes: string;
+}
+
+export interface PlantInventory {
+  plants: PlantRecord[];
 }
 
 export interface Sector {

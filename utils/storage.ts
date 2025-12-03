@@ -1,11 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Activity, Bench, UserSettings, GreenhouseConfig, DEFAULT_GREENHOUSE_CONFIG } from '@/types';
+import { Activity, Bench, UserSettings, GreenhouseConfig, DEFAULT_GREENHOUSE_CONFIG, PlantRecord, PlantInventory } from '@/types';
 
 const KEYS = {
   ACTIVITIES: 'serra_activities',
   BENCHES: 'serra_benches',
   SETTINGS: 'serra_settings',
   GREENHOUSE_CONFIG: 'serra_greenhouse_config',
+  PLANT_INVENTORY: 'serra_plant_inventory',
 };
 
 export const generateId = (): string => {
@@ -231,9 +232,46 @@ export const storage = {
     await AsyncStorage.setItem(KEYS.BENCHES, JSON.stringify(benches));
   },
 
+  async getPlantInventory(): Promise<PlantInventory> {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.PLANT_INVENTORY);
+      return data ? JSON.parse(data) : { plants: [] };
+    } catch (error) {
+      console.error('Error getting plant inventory:', error);
+      return { plants: [] };
+    }
+  },
+
+  async savePlantRecord(record: Omit<PlantRecord, 'id'>): Promise<PlantRecord> {
+    try {
+      const inventory = await this.getPlantInventory();
+      const newRecord: PlantRecord = {
+        ...record,
+        id: generateId(),
+      };
+      inventory.plants.unshift(newRecord);
+      await AsyncStorage.setItem(KEYS.PLANT_INVENTORY, JSON.stringify(inventory));
+      return newRecord;
+    } catch (error) {
+      console.error('Error saving plant record:', error);
+      throw error;
+    }
+  },
+
+  async deletePlantRecord(id: string): Promise<void> {
+    try {
+      const inventory = await this.getPlantInventory();
+      inventory.plants = inventory.plants.filter(p => p.id !== id);
+      await AsyncStorage.setItem(KEYS.PLANT_INVENTORY, JSON.stringify(inventory));
+    } catch (error) {
+      console.error('Error deleting plant record:', error);
+      throw error;
+    }
+  },
+
   async clearAllData(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([KEYS.ACTIVITIES, KEYS.BENCHES, KEYS.SETTINGS]);
+      await AsyncStorage.multiRemove([KEYS.ACTIVITIES, KEYS.BENCHES, KEYS.SETTINGS, KEYS.PLANT_INVENTORY]);
     } catch (error) {
       console.error('Error clearing data:', error);
       throw error;
