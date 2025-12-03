@@ -75,6 +75,7 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
 
   const extractDataFromDocument = async (uri: string) => {
     setOcrLoading(true);
+    setShowForm(true);
     try {
       const extractedData = await extractPlantDataFromImage(uri);
       
@@ -86,16 +87,12 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
         quantity: extractedData.quantity?.toString() || prev.quantity,
       }));
 
-      if (extractedData.confidence > 0) {
-        Alert.alert(
-          "Dati Estratti",
-          `Confidence: ${(extractedData.confidence * 100).toFixed(0)}%\n\nRevisa i dati estratti nel form e completa se necessario.`
-        );
-      } else {
-        Alert.alert("Info", "Nessun dato estratto. Completa manualmente il form.");
-      }
+      Alert.alert(
+        "Foto Caricata",
+        "Il form è stato preparato. Rivisa e completa i dati, poi salva."
+      );
     } catch (error) {
-      Alert.alert("Errore", "Impossibile estrarre i dati dall'immagine");
+      Alert.alert("Errore", "Impossibile caricare l'immagine. Riprova.");
     } finally {
       setOcrLoading(false);
     }
