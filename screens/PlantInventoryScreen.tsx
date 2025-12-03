@@ -182,35 +182,31 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
             <ThemedText style={styles.addButtonText}>Aggiungi Manuale</ThemedText>
           </Pressable>
 
-          {Platform.OS !== "web" && (
-            <>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.addButton,
-                  styles.secondaryButton,
-                  { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
-                ]}
-                onPress={handlePickImage}
-                disabled={ocrLoading}
-              >
-                <Feather name="camera" size={20} color={theme.text} />
-                <ThemedText style={{ color: theme.text }}>Da Foto</ThemedText>
-              </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.addButton,
+              styles.secondaryButton,
+              { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
+            ]}
+            onPress={handlePickImage}
+            disabled={ocrLoading}
+          >
+            <Feather name="camera" size={20} color={theme.text} />
+            <ThemedText style={{ color: theme.text }}>Da Foto</ThemedText>
+          </Pressable>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.addButton,
-                  styles.secondaryButton,
-                  { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
-                ]}
-                onPress={handlePickDocument}
-                disabled={ocrLoading}
-              >
-                <Feather name="file" size={20} color={theme.text} />
-                <ThemedText style={{ color: theme.text }}>Da PDF</ThemedText>
-              </Pressable>
-            </>
-          )}
+          <Pressable
+            style={({ pressed }) => [
+              styles.addButton,
+              styles.secondaryButton,
+              { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
+            ]}
+            onPress={handlePickDocument}
+            disabled={ocrLoading}
+          >
+            <Feather name="file" size={20} color={theme.text} />
+            <ThemedText style={{ color: theme.text }}>Da PDF</ThemedText>
+          </Pressable>
         </View>
       ) : (
         <View style={[styles.formCard, { backgroundColor: theme.backgroundDefault }]}>
