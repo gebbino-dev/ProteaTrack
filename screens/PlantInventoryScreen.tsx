@@ -1,8 +1,10 @@
 import React, { useState, useCallback } from "react";
-import { View, StyleSheet, TextInput, Alert, Pressable, ScrollView } from "react-native";
+import { View, StyleSheet, TextInput, Alert, Pressable, ScrollView, ActivityIndicator, Platform } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 
 import { ScreenKeyboardAwareScrollView } from "@/components/ScreenKeyboardAwareScrollView";
 import { ThemedText } from "@/components/ThemedText";
@@ -10,6 +12,7 @@ import Spacer from "@/components/Spacer";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { storage } from "@/utils/storage";
+import { extractPlantDataFromImage } from "@/utils/ocr";
 import { PlantRecord, PlantInventory } from "@/types";
 import { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 
@@ -21,6 +24,7 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
   const { theme } = useTheme();
   const [inventory, setInventory] = useState<PlantInventory>({ plants: [] });
   const [showForm, setShowForm] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
   const [formData, setFormData] = useState({
     variety: "",
     species: "",
@@ -38,6 +42,64 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
       loadInventory();
     }, [])
   );
+
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await extractDataFromDocument(result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert("Errore", "Impossibile caricare l'immagine");
+    }
+  };
+
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+      });
+
+      if (result.assets && result.assets[0]) {
+        Alert.alert("Info", "Per PDF è consigliato fare una foto della prima pagina con la fotocamera");
+      }
+    } catch (error) {
+      Alert.alert("Errore", "Impossibile caricare il documento");
+    }
+  };
+
+  const extractDataFromDocument = async (uri: string) => {
+    setOcrLoading(true);
+    try {
+      const extractedData = await extractPlantDataFromImage(uri);
+      
+      // Aggiorna il form con i dati estratti
+      setFormData(prev => ({
+        ...prev,
+        variety: extractedData.variety || prev.variety,
+        species: extractedData.species || prev.species,
+        quantity: extractedData.quantity?.toString() || prev.quantity,
+      }));
+
+      if (extractedData.confidence > 0) {
+        Alert.alert(
+          "Dati Estratti",
+          `Confidence: ${(extractedData.confidence * 100).toFixed(0)}%\n\nRevisa i dati estratti nel form e completa se necessario.`
+        );
+      } else {
+        Alert.alert("Info", "Nessun dato estratto. Completa manualmente il form.");
+      }
+    } catch (error) {
+      Alert.alert("Errore", "Impossibile estrarre i dati dall'immagine");
+    } finally {
+      setOcrLoading(false);
+    }
+  };
 
   const handleAddPlant = async () => {
     if (!formData.variety.trim()) {
@@ -107,16 +169,49 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
       <Spacer height={Spacing.md} />
 
       {!showForm ? (
-        <Pressable
-          style={({ pressed }) => [
-            styles.addButton,
-            { backgroundColor: theme.primary, opacity: pressed ? 0.8 : 1 },
-          ]}
-          onPress={() => setShowForm(true)}
-        >
-          <Feather name="plus" size={20} color="#FFFFFF" />
-          <ThemedText style={styles.addButtonText}>Aggiungi Pianta</ThemedText>
-        </Pressable>
+        <View style={styles.buttonGroup}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.addButton,
+              styles.mainButton,
+              { backgroundColor: theme.primary, opacity: pressed ? 0.8 : 1 },
+            ]}
+            onPress={() => setShowForm(true)}
+          >
+            <Feather name="plus" size={20} color="#FFFFFF" />
+            <ThemedText style={styles.addButtonText}>Aggiungi Manuale</ThemedText>
+          </Pressable>
+
+          {Platform.OS !== "web" && (
+            <>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.addButton,
+                  styles.secondaryButton,
+                  { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={handlePickImage}
+                disabled={ocrLoading}
+              >
+                <Feather name="camera" size={20} color={theme.text} />
+                <ThemedText style={{ color: theme.text }}>Da Foto</ThemedText>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.addButton,
+                  styles.secondaryButton,
+                  { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={handlePickDocument}
+                disabled={ocrLoading}
+              >
+                <Feather name="file" size={20} color={theme.text} />
+                <ThemedText style={{ color: theme.text }}>Da PDF</ThemedText>
+              </Pressable>
+            </>
+          )}
+        </View>
       ) : (
         <View style={[styles.formCard, { backgroundColor: theme.backgroundDefault }]}>
           <ThemedText type="body" style={styles.formLabel}>
@@ -204,6 +299,14 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
 
       <Spacer height={Spacing.lg} />
 
+      {ocrLoading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Spacer height={Spacing.md} />
+          <ThemedText>Estrazione dati in corso...</ThemedText>
+        </View>
+      )}
+
       <ThemedText type="body" style={{ color: theme.textSecondary }}>
         Piante in inventario: {inventory.plants.length}
       </ThemedText>
@@ -249,6 +352,10 @@ const styles = StyleSheet.create({
   title: {
     marginBottom: Spacing.md,
   },
+  buttonGroup: {
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
   addButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -256,7 +363,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.lg,
     borderRadius: BorderRadius.md,
     gap: Spacing.sm,
-    marginBottom: Spacing.lg,
+  },
+  mainButton: {
+    marginBottom: 0,
+  },
+  secondaryButton: {
+    marginBottom: 0,
   },
   addButtonText: {
     color: "#FFFFFF",
@@ -306,5 +418,10 @@ const styles = StyleSheet.create({
   },
   plantInfo: {
     flex: 1,
+  },
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing["2xl"],
   },
 });
