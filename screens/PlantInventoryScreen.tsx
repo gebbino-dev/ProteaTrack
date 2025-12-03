@@ -5,6 +5,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 
 import { ScreenKeyboardAwareScrollView } from "@/components/ScreenKeyboardAwareScrollView";
 import { ThemedText } from "@/components/ThemedText";
@@ -148,6 +150,28 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
     ]);
   };
 
+  const handleExportData = async () => {
+    try {
+      const csvData = await storage.exportPlantInventoryAsCSV();
+      const fileName = `inventario-piante-${new Date().toISOString().split('T')[0]}.csv`;
+      const filePath = `${FileSystem.documentDirectory}${fileName}`;
+      
+      await FileSystem.writeAsStringAsync(filePath, csvData, { encoding: FileSystem.EncodingType.UTF8 });
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(filePath, {
+          mimeType: 'text/csv',
+          dialogTitle: 'Esporta Inventario Piante',
+        });
+      } else {
+        Alert.alert("Successo", "File creato in: " + filePath);
+      }
+    } catch (error) {
+      Alert.alert("Errore", "Impossibile esportare i dati");
+      console.error('Export error:', error);
+    }
+  };
+
   const inputStyle = [
     styles.input,
     {
@@ -166,44 +190,59 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
       <Spacer height={Spacing.md} />
 
       {!showForm ? (
-        <View style={styles.buttonGroup}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.addButton,
-              styles.mainButton,
-              { backgroundColor: theme.primary, opacity: pressed ? 0.8 : 1 },
-            ]}
-            onPress={() => setShowForm(true)}
-          >
-            <Feather name="plus" size={20} color="#FFFFFF" />
-            <ThemedText style={styles.addButtonText}>Aggiungi Manuale</ThemedText>
-          </Pressable>
+        <View>
+          <View style={styles.buttonGroup}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.addButton,
+                styles.mainButton,
+                { backgroundColor: theme.primary, opacity: pressed ? 0.8 : 1 },
+              ]}
+              onPress={() => setShowForm(true)}
+            >
+              <Feather name="plus" size={20} color="#FFFFFF" />
+              <ThemedText style={styles.addButtonText}>Aggiungi Manuale</ThemedText>
+            </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.addButton,
-              styles.secondaryButton,
-              { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
-            ]}
-            onPress={handlePickImage}
-            disabled={ocrLoading}
-          >
-            <Feather name="camera" size={20} color={theme.text} />
-            <ThemedText style={{ color: theme.text }}>Da Foto</ThemedText>
-          </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.addButton,
+                styles.secondaryButton,
+                { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
+              ]}
+              onPress={handlePickImage}
+              disabled={ocrLoading}
+            >
+              <Feather name="camera" size={20} color={theme.text} />
+              <ThemedText style={{ color: theme.text }}>Da Foto</ThemedText>
+            </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.addButton,
-              styles.secondaryButton,
-              { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
-            ]}
-            onPress={handlePickDocument}
-            disabled={ocrLoading}
-          >
-            <Feather name="file" size={20} color={theme.text} />
-            <ThemedText style={{ color: theme.text }}>Da PDF</ThemedText>
-          </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.addButton,
+                styles.secondaryButton,
+                { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
+              ]}
+              onPress={handlePickDocument}
+              disabled={ocrLoading}
+            >
+              <Feather name="file" size={20} color={theme.text} />
+              <ThemedText style={{ color: theme.text }}>Da PDF</ThemedText>
+            </Pressable>
+          </View>
+
+          {inventory.plants.length > 0 && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.exportButton,
+                { backgroundColor: theme.primary, opacity: pressed ? 0.8 : 1 },
+              ]}
+              onPress={handleExportData}
+            >
+              <Feather name="download" size={20} color="#FFFFFF" />
+              <ThemedText style={styles.exportButtonText}>Esporta CSV</ThemedText>
+            </Pressable>
+          )}
         </View>
       ) : (
         <View style={[styles.formCard, { backgroundColor: theme.backgroundDefault }]}>
@@ -416,5 +455,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: Spacing["2xl"],
+  },
+  exportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  exportButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

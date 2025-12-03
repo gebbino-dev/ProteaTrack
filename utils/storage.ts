@@ -277,4 +277,48 @@ export const storage = {
       throw error;
     }
   },
+
+  async exportPlantInventoryAsCSV(): Promise<string> {
+    try {
+      const inventory = await this.getPlantInventory();
+      const plants = inventory.plants;
+
+      if (plants.length === 0) {
+        return 'Varietà,Specie,Numero Piante,Data Arrivo,Note\n';
+      }
+
+      // Ordinamento per specie/genere
+      const sortedPlants = [...plants].sort((a, b) => {
+        const speciesA = (a.species || a.variety || '').toLowerCase();
+        const speciesB = (b.species || b.variety || '').toLowerCase();
+        if (speciesA !== speciesB) {
+          return speciesA.localeCompare(speciesB);
+        }
+        return (a.variety || '').localeCompare(b.variety || '');
+      });
+
+      // Intestazione CSV
+      let csv = 'Varietà,Specie,Numero Piante,Data Arrivo,Note\n';
+
+      // Aggiungi righe di dati
+      for (const plant of sortedPlants) {
+        const variety = (plant.variety || '').replace(/,/g, ';');
+        const species = (plant.species || '').replace(/,/g, ';');
+        const quantity = plant.quantity || 0;
+        const date = plant.arrivalDate || '';
+        const notes = (plant.notes || '').replace(/,/g, ';').replace(/\n/g, ' ');
+
+        csv += `"${variety}","${species}",${quantity},"${date}","${notes}"\n`;
+      }
+
+      // Aggiungi riga di totale
+      const totalQuantity = sortedPlants.reduce((sum, plant) => sum + (plant.quantity || 0), 0);
+      csv += `\nTOTALE PIANTE,,,${totalQuantity},,\n`;
+
+      return csv;
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      throw error;
+    }
+  },
 };

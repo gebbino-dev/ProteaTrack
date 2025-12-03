@@ -1,3 +1,6 @@
+import * as FileSystem from 'expo-file-system';
+import { Tesseract } from 'tesseract.js';
+
 interface ExtractedPlantData {
   variety?: string;
   species?: string;
@@ -6,19 +9,29 @@ interface ExtractedPlantData {
 }
 
 /**
- * Estrae testo da immagine usando pattern matching locale
- * Ricerca varietà conosciute e numeri nel documento
+ * Estrae testo da immagine usando Tesseract.js OCR
  */
 export async function extractPlantDataFromImage(
   imageUri: string
 ): Promise<ExtractedPlantData> {
   try {
-    // Simula estrazione dati da immagine
-    // In futuro, implementare OCR vero con Tesseract.js
-    
-    // Per ora usa pattern matching semplice
-    // che l'utente può completare manualmente
-    return extractFromSimplePatterns(imageUri);
+    // Leggi immagine come base64
+    const base64Image = await FileSystem.readAsStringAsync(imageUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    // Crea data URL per Tesseract
+    const dataUrl = `data:image/jpeg;base64,${base64Image}`;
+
+    // Esegui OCR con Tesseract.js
+    const result = await Tesseract.recognize(dataUrl, 'ita');
+    const extractedText = result.data.text;
+
+    if (!extractedText || extractedText.length < 5) {
+      return { confidence: 0 };
+    }
+
+    return parseExtractedText(extractedText);
   } catch (error) {
     console.error('OCR extraction error:', error);
     return { confidence: 0 };
@@ -26,12 +39,11 @@ export async function extractPlantDataFromImage(
 }
 
 /**
- * Usa pattern matching semplice
+ * Parsa il testo estratto per trovare varietà, specie, quantità
  */
-function extractFromSimplePatterns(imageUri: string): ExtractedPlantData {
+function parseExtractedText(text: string): ExtractedPlantData {
   const data: ExtractedPlantData = { confidence: 0 };
 
-  // Carica liste di varietà conosciute per pattern matching
   const knownVarieties = [
     'Leucospermum cordifolium',
     'Protea cynaroides',
@@ -43,12 +55,42 @@ function extractFromSimplePatterns(imageUri: string): ExtractedPlantData {
     'Leucadendron laureolum',
     'Banksia prionotes',
     'Protea neriifolia',
+    'Protea',
+    'Leucospermum',
+    'Leucadendron',
+    'Banksia',
   ];
 
-  // Simula estrazione semplice
-  // L'utente dovrà principalmente compilare il form manualmente
-  data.confidence = 0;
+  // Ricerca varietà
+  const lowerText = text.toLowerCase();
+  for (const variety of knownVarieties) {
+    if (lowerText.includes(variety.toLowerCase())) {
+      data.variety = variety;
+      data.confidence += 0.4;
+      break;
+    }
+  }
+
+  // Ricerca "Proteaceae" come famiglia
+  if (lowerText.includes('proteaceae')) {
+    data.species = 'Proteaceae';
+    data.confidence += 0.3;
+  }
+
+  // Ricerca numeri (quantità)
+  // Cerca il primo numero significativo (almeno 10)
+  const numberMatches = text.match(/\b([1-9]\d{1,4})\b/g);
+  if (numberMatches && numberMatches.length > 0) {
+    const numbers = numberMatches.map(n => parseInt(n, 10));
+    const maxNumber = Math.max(...numbers);
+    if (maxNumber > 5 && maxNumber < 100000) {
+      data.quantity = maxNumber;
+      data.confidence += 0.3;
+    }
+  }
+
+  // Normalizza confidence tra 0 e 1
+  data.confidence = Math.min(data.confidence, 1);
 
   return data;
 }
-
