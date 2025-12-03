@@ -29,6 +29,7 @@
     "expo-image": "~3.0.10",
     "expo-image-picker": "^17.0.8",
     "expo-linking": "~8.0.8",
+    "expo-sharing": "^14.0.7",
     "expo-splash-screen": "~31.0.10",
     "expo-status-bar": "~3.0.8",
     "expo-symbols": "~1.0.7",
