@@ -23,7 +23,7 @@ export interface Bench {
   variety: string;
   plantingDate: string;
   notes: string;
-  plaquette: number;
+  placche: number;
 }
 
 export interface PlantRecord {

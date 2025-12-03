@@ -26,6 +26,7 @@ export default function EditBenchScreen({ navigation, route }: EditBenchScreenPr
   const [variety, setVariety] = useState("");
   const [plantingDate, setPlantingDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [placche, setPlacche] = useState("");
   const [saving, setSaving] = useState(false);
   const [showVarietyPicker, setShowVarietyPicker] = useState(false);
 
@@ -37,6 +38,7 @@ export default function EditBenchScreen({ navigation, route }: EditBenchScreenPr
         setVariety(benchData.variety);
         setPlantingDate(benchData.plantingDate);
         setNotes(benchData.notes);
+        setPlacche(benchData.placche?.toString() || "0");
       }
     };
     loadBench();
@@ -44,6 +46,7 @@ export default function EditBenchScreen({ navigation, route }: EditBenchScreenPr
 
   const handleSave = async () => {
     const count = parseInt(plantCount) || 0;
+    const numPlacche = parseInt(placche) || 0;
     if (count < 0) {
       Alert.alert("Errore", "Il numero di piante non può essere negativo");
       return;
@@ -59,6 +62,7 @@ export default function EditBenchScreen({ navigation, route }: EditBenchScreenPr
         variety,
         plantingDate,
         notes,
+        placche: numPlacche,
       });
       navigation.goBack();
     } catch (error) {
@@ -194,6 +198,31 @@ export default function EditBenchScreen({ navigation, route }: EditBenchScreenPr
         keyboardType="number-pad"
         maxLength={10}
       />
+
+      <Spacer height={Spacing["2xl"]} />
+
+      <ThemedText type="h4" style={styles.sectionTitle}>
+        Numero di Placche (1 placca = 6 piante)
+      </ThemedText>
+      <Spacer height={Spacing.md} />
+      <TextInput
+        style={[
+          styles.input,
+          {
+            backgroundColor: theme.backgroundDefault,
+            color: theme.text,
+            borderColor: theme.backgroundSecondary,
+          },
+        ]}
+        placeholder="0"
+        placeholderTextColor={theme.textSecondary}
+        value={placche}
+        onChangeText={setPlacche}
+        keyboardType="number-pad"
+      />
+      <ThemedText style={{ color: theme.textSecondary, fontSize: 12, marginTop: Spacing.sm }}>
+        Capienza totale: {parseInt(placche) * 6 || 0} piante
+      </ThemedText>
 
       <Spacer height={Spacing["2xl"]} />
 
