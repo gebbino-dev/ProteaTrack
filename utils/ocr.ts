@@ -1,7 +1,4 @@
-import * as FileSystem from 'expo-file-system';
-import { Tesseract } from 'tesseract.js';
-
-interface ExtractedPlantData {
+export interface ExtractedPlantData {
   variety?: string;
   species?: string;
   quantity?: number;
@@ -9,39 +6,36 @@ interface ExtractedPlantData {
 }
 
 /**
- * Estrae testo da immagine usando Tesseract.js OCR
+ * Estrae dati da immagine caricata (semplificato senza Tesseract)
+ * L'utente revisualizzerà i dati nella schermata OCR Review
  */
 export async function extractPlantDataFromImage(
   imageUri: string
 ): Promise<ExtractedPlantData> {
   try {
-    // Leggi immagine come base64
-    const base64Image = await FileSystem.readAsStringAsync(imageUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-
-    // Crea data URL per Tesseract
-    const dataUrl = `data:image/jpeg;base64,${base64Image}`;
-
-    // Esegui OCR con Tesseract.js
-    const result = await Tesseract.recognize(dataUrl, 'ita');
-    const extractedText = result.data.text;
-
-    if (!extractedText || extractedText.length < 5) {
-      return { confidence: 0 };
-    }
-
-    return parseExtractedText(extractedText);
+    // Versione semplificata: ritorna dati vuoti
+    // L'utente completerà manualmente o tramite la schermata di revisione
+    return {
+      variety: undefined,
+      species: undefined,
+      quantity: undefined,
+      confidence: 0,
+    };
   } catch (error) {
-    console.error('OCR extraction error:', error);
-    return { confidence: 0 };
+    console.error('Image processing error:', error);
+    return {
+      variety: undefined,
+      species: undefined,
+      quantity: undefined,
+      confidence: 0,
+    };
   }
 }
 
 /**
  * Parsa il testo estratto per trovare varietà, specie, quantità
  */
-function parseExtractedText(text: string): ExtractedPlantData {
+export function parseExtractedText(text: string): ExtractedPlantData {
   const data: ExtractedPlantData = { confidence: 0 };
 
   const knownVarieties = [
@@ -61,8 +55,8 @@ function parseExtractedText(text: string): ExtractedPlantData {
     'Banksia',
   ];
 
-  // Ricerca varietà
   const lowerText = text.toLowerCase();
+  
   for (const variety of knownVarieties) {
     if (lowerText.includes(variety.toLowerCase())) {
       data.variety = variety;
@@ -71,14 +65,11 @@ function parseExtractedText(text: string): ExtractedPlantData {
     }
   }
 
-  // Ricerca "Proteaceae" come famiglia
   if (lowerText.includes('proteaceae')) {
     data.species = 'Proteaceae';
     data.confidence += 0.3;
   }
 
-  // Ricerca numeri (quantità)
-  // Cerca il primo numero significativo (almeno 10)
   const numberMatches = text.match(/\b([1-9]\d{1,4})\b/g);
   if (numberMatches && numberMatches.length > 0) {
     const numbers = numberMatches.map(n => parseInt(n, 10));
@@ -89,8 +80,6 @@ function parseExtractedText(text: string): ExtractedPlantData {
     }
   }
 
-  // Normalizza confidence tra 0 e 1
   data.confidence = Math.min(data.confidence, 1);
-
   return data;
 }
