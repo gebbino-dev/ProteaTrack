@@ -14,7 +14,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { storage } from "@/utils/storage";
-import { GreenhouseConfig, Bench } from "@/types";
+import { GREENHOUSES, SECTORS_PER_GREENHOUSE, Bench } from "@/types";
 import { GreenhouseStackParamList } from "@/navigation/GreenhouseStackNavigator";
 
 type GreenhouseListScreenProps = {
@@ -25,13 +25,12 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface GreenhouseCardProps {
   greenhouse: number;
-  name?: string;
   plantCount: number;
   sectorCount: number;
   onPress: () => void;
 }
 
-function GreenhouseCard({ greenhouse, name, plantCount, sectorCount, onPress }: GreenhouseCardProps) {
+function GreenhouseCard({ greenhouse, plantCount, sectorCount, onPress }: GreenhouseCardProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
 
@@ -68,9 +67,9 @@ function GreenhouseCard({ greenhouse, name, plantCount, sectorCount, onPress }: 
           <Feather name="home" size={24} color="#FFFFFF" />
         </View>
         <View style={styles.cardTitleContainer}>
-          <ThemedText type="h4">{name || `Serra ${greenhouse}`}</ThemedText>
+          <ThemedText type="h4">Serra {greenhouse}</ThemedText>
           <ThemedText style={{ color: theme.textSecondary }}>
-            {sectorCount} settori
+            2000 m² - 3 Arcate
           </ThemedText>
         </View>
         <Feather name="chevron-right" size={24} color={theme.tabIconDefault} />
@@ -102,30 +101,23 @@ function GreenhouseCard({ greenhouse, name, plantCount, sectorCount, onPress }: 
 export default function GreenhouseListScreen({ navigation }: GreenhouseListScreenProps) {
   const { theme } = useTheme();
   const [benchData, setBenchData] = useState<Bench[]>([]);
-  const [config, setConfig] = useState<GreenhouseConfig | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      const loadData = async () => {
-        const [benches, ghConfig] = await Promise.all([
-          storage.getBenches(),
-          storage.getGreenhouseConfig(),
-        ]);
+      const loadBenches = async () => {
+        const benches = await storage.getBenches();
         setBenchData(benches);
-        setConfig(ghConfig);
       };
-      loadData();
+      loadBenches();
     }, [])
   );
 
-  const getGreenhouseStats = (ghId: number) => {
-    const greenhouseBenches = benchData.filter(b => b.greenhouse === ghId);
+  const getGreenhouseStats = (greenhouse: number) => {
+    const sectors = SECTORS_PER_GREENHOUSE[greenhouse];
+    const greenhouseBenches = benchData.filter(b => b.greenhouse === greenhouse);
     const plantCount = greenhouseBenches.reduce((sum, b) => sum + b.plantCount, 0);
-    const gh = config?.greenhouses.find(g => g.id === ghId);
-    return { plantCount, sectorCount: gh?.sectors.length || 0 };
+    return { plantCount, sectorCount: sectors.length };
   };
-
-  if (!config) return null;
 
   return (
     <ScreenScrollView>
@@ -133,16 +125,15 @@ export default function GreenhouseListScreen({ navigation }: GreenhouseListScree
         Seleziona una serra per visualizzare i settori e i bancali
       </ThemedText>
 
-      {config.greenhouses.map((greenhouse) => {
-        const stats = getGreenhouseStats(greenhouse.id);
+      {GREENHOUSES.map((greenhouse) => {
+        const stats = getGreenhouseStats(greenhouse);
         return (
-          <View key={greenhouse.id} style={{ marginBottom: Spacing.lg }}>
+          <View key={greenhouse} style={{ marginBottom: Spacing.lg }}>
             <GreenhouseCard
-              greenhouse={greenhouse.id}
-              name={greenhouse.customName}
+              greenhouse={greenhouse}
               plantCount={stats.plantCount}
               sectorCount={stats.sectorCount}
-              onPress={() => navigation.navigate("SectorList", { greenhouse: greenhouse.id })}
+              onPress={() => navigation.navigate("SectorList", { greenhouse })}
             />
           </View>
         );
