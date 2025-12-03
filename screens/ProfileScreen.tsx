@@ -215,7 +215,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
             opacity: pressed ? 0.8 : 1,
           },
         ]}
-        onPress={() => navigation.navigate("Profile")}
+        onPress={() => navigation.navigate("ConfigureGreenhouse")}
       >
         <Feather name="settings" size={20} color="#FFFFFF" />
         <ThemedText style={styles.saveButtonText}>

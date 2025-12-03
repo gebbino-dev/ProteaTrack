@@ -10,7 +10,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { storage } from "@/utils/storage";
-import { SECTORS_PER_GREENHOUSE, BENCHES, Bench } from "@/types";
+import { Bench, GreenhouseConfig } from "@/types";
 import { GreenhouseStackParamList } from "@/navigation/GreenhouseStackNavigator";
 
 type SectorListScreenProps = {
@@ -19,28 +19,42 @@ type SectorListScreenProps = {
 };
 
 export default function SectorListScreen({ navigation, route }: SectorListScreenProps) {
-  const { greenhouse } = route.params;
+  const { greenhouse: greenhouseId } = route.params;
   const { theme } = useTheme();
   const [benchData, setBenchData] = useState<Bench[]>([]);
-
-  const sectors = SECTORS_PER_GREENHOUSE[greenhouse];
-  const sectorGroups = [];
-  for (let i = 0; i < sectors.length; i += 3) {
-    sectorGroups.push(sectors.slice(i, i + 3));
-  }
+  const [config, setConfig] = useState<GreenhouseConfig | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      const loadBenches = async () => {
-        const benches = await storage.getBenches();
-        setBenchData(benches.filter((b) => b.greenhouse === greenhouse));
+      const loadData = async () => {
+        const [benches, ghConfig] = await Promise.all([
+          storage.getBenches(),
+          storage.getGreenhouseConfig(),
+        ]);
+        setBenchData(benches.filter((b) => b.greenhouse === greenhouseId));
+        setConfig(ghConfig);
       };
-      loadBenches();
-    }, [greenhouse])
+      loadData();
+    }, [greenhouseId])
   );
 
-  const getSectorStats = (sector: number) => {
-    const sectorBenches = benchData.filter((b) => b.sector === sector);
+  if (!config) return null;
+
+  const greenhouse = config.greenhouses.find((g) => g.id === greenhouseId);
+  if (!greenhouse) return null;
+
+  const sectorGroups = [];
+  for (let i = 0; i < greenhouse.sectors.length; i += 3) {
+    sectorGroups.push(greenhouse.sectors.slice(i, i + 3));
+  }
+
+  const benchNames = greenhouse.benchNames || Array.from(
+    { length: greenhouse.benchCount },
+    (_, i) => `B${i + 1}`
+  );
+
+  const getSectorStats = (sectorId: number) => {
+    const sectorBenches = benchData.filter((b) => b.sector === sectorId);
     const plantCount = sectorBenches.reduce((sum, b) => sum + b.plantCount, 0);
     const activeBenches = sectorBenches.filter((b) => b.plantCount > 0).length;
     return { plantCount, activeBenches };
@@ -52,9 +66,9 @@ export default function SectorListScreen({ navigation, route }: SectorListScreen
         <View key={`group-${groupIndex}`} style={styles.groupSection}>
           <View style={styles.sectorsGrid}>
             {group.map((sector) => {
-              const stats = getSectorStats(sector);
+              const stats = getSectorStats(sector.id);
               return (
-                <View key={sector} style={styles.sectorWrapper}>
+                <View key={sector.id} style={styles.sectorWrapper}>
                   <Pressable
                     style={({ pressed }) => [
                       styles.sectorCard,
@@ -64,24 +78,24 @@ export default function SectorListScreen({ navigation, route }: SectorListScreen
                     onPress={() => {}}
                   >
                     <ThemedText type="h4" style={styles.sectorTitle}>
-                      Settore {sector}
+                      {sector.customName || `Settore ${sector.id}`}
                     </ThemedText>
                     <ThemedText
                       style={{ color: theme.textSecondary, fontSize: 12, marginBottom: Spacing.sm }}
                     >
-                      {stats.plantCount} piante - {stats.activeBenches}/5 bancali
+                      {stats.plantCount} piante - {stats.activeBenches}/{benchNames.length} bancali
                     </ThemedText>
 
                     <View style={styles.benchesRow}>
-                      {BENCHES.map((bench) => {
+                      {benchNames.map((benchName) => {
                         const benchInfo = benchData.find(
-                          (b) => b.sector === sector && b.benchNumber === bench
+                          (b) => b.sector === sector.id && b.benchNumber === benchName
                         );
                         const hasPlants = benchInfo && benchInfo.plantCount > 0;
 
                         return (
                           <Pressable
-                            key={bench}
+                            key={benchName}
                             style={({ pressed }) => [
                               styles.benchButton,
                               {
@@ -93,9 +107,9 @@ export default function SectorListScreen({ navigation, route }: SectorListScreen
                             ]}
                             onPress={() =>
                               navigation.navigate("BenchDetail", {
-                                greenhouse,
-                                sector,
-                                bench,
+                                greenhouse: greenhouseId,
+                                sector: sector.id,
+                                bench: benchName,
                               })
                             }
                           >
@@ -105,7 +119,7 @@ export default function SectorListScreen({ navigation, route }: SectorListScreen
                                 { color: hasPlants ? "#FFFFFF" : theme.text },
                               ]}
                             >
-                              {bench}
+                              {benchName}
                             </ThemedText>
                           </Pressable>
                         );
