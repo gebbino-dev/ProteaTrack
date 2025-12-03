@@ -318,43 +318,72 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
 
       <Spacer height={Spacing.lg} />
 
-      <ThemedText type="body" style={{ color: theme.textSecondary }}>
-        Piante in inventario: {inventory.plants.length}
-      </ThemedText>
+      {inventory.plants.length > 0 && (
+        <>
+          <ThemedText type="h4" style={{ color: theme.text, marginBottom: Spacing.md }}>
+            Piante in inventario ({inventory.plants.length})
+          </ThemedText>
 
-      <Spacer height={Spacing.md} />
-
-      <ScrollView style={{ maxHeight: 500 }}>
-        {inventory.plants.map((plant) => (
-          <View
-            key={plant.id}
-            style={[styles.plantCard, { backgroundColor: theme.backgroundDefault }]}
-          >
-            <View style={styles.plantInfo}>
-              <ThemedText type="body">{plant.variety}</ThemedText>
-              {plant.species && (
-                <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
-                  {plant.species}
-                </ThemedText>
-              )}
-              <ThemedText style={{ color: theme.primary, fontSize: 14, marginTop: Spacing.sm }}>
-                {plant.quantity} piante
-              </ThemedText>
-              <ThemedText
-                style={{ color: theme.textSecondary, fontSize: 12, marginTop: Spacing.sm }}
-              >
-                Arrivo: {plant.arrivalDate}
-              </ThemedText>
-            </View>
-            <Pressable
-              onPress={() => handleDeletePlant(plant.id)}
-              style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+          {inventory.plants.map((plant) => (
+            <View
+              key={plant.id}
+              style={[
+                styles.plantCard,
+                {
+                  backgroundColor: theme.backgroundDefault,
+                  borderColor: theme.backgroundSecondary,
+                  borderWidth: 1,
+                },
+              ]}
             >
-              <Feather name="trash-2" size={18} color={theme.error} />
-            </Pressable>
-          </View>
-        ))}
-      </ScrollView>
+              <View style={styles.plantInfo}>
+                <ThemedText type="body" style={{ fontWeight: "600" }}>
+                  {plant.variety}
+                </ThemedText>
+                {plant.species && (
+                  <ThemedText style={{ color: theme.textSecondary, fontSize: 12, marginTop: Spacing.xs }}>
+                    {plant.species}
+                  </ThemedText>
+                )}
+                <View style={{ flexDirection: "row", gap: Spacing.md, marginTop: Spacing.md }}>
+                  <ThemedText style={{ color: theme.primary, fontSize: 16, fontWeight: "600" }}>
+                    {plant.quantity}
+                  </ThemedText>
+                  <ThemedText style={{ color: theme.textSecondary, fontSize: 14 }}>
+                    piante
+                  </ThemedText>
+                </View>
+                <ThemedText
+                  style={{
+                    color: theme.textSecondary,
+                    fontSize: 12,
+                    marginTop: Spacing.sm,
+                  }}
+                >
+                  Arrivo: {plant.arrivalDate}
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={() => handleDeletePlant(plant.id)}
+                style={({ pressed }) => [
+                  styles.deleteButton,
+                  { opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <Feather name="trash-2" size={24} color={theme.error} />
+              </Pressable>
+            </View>
+          ))}
+        </>
+      )}
+
+      {inventory.plants.length === 0 && !showForm && (
+        <View style={{ alignItems: "center", paddingVertical: Spacing.xl }}>
+          <ThemedText style={{ color: theme.textSecondary }}>
+            Nessuna pianta aggiunta. Clicca "Aggiungi Manuale" per iniziare.
+          </ThemedText>
+        </View>
+      )}
 
       <Spacer height={Spacing["2xl"]} />
     </ScreenKeyboardAwareScrollView>
@@ -431,6 +460,11 @@ const styles = StyleSheet.create({
   },
   plantInfo: {
     flex: 1,
+  },
+  deleteButton: {
+    padding: Spacing.md,
+    justifyContent: "center",
+    alignItems: "center",
   },
   exportButton: {
     flexDirection: "row",
