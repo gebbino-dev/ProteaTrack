@@ -45,28 +45,79 @@ export default function DocumentScanScreen({ navigation }: DocumentScanScreenPro
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingPlant, setEditingPlant] = useState<ScannedPlant | null>(null);
   const [editForm, setEditForm] = useState({ variety: "", species: "", quantity: "" });
+  const [pasteText, setPasteText] = useState("");
+  const [showPasteInput, setShowPasteInput] = useState(false);
 
   const generateId = () => Math.random().toString(36).substring(2, 15);
 
-  const STOP_WORDS = [
-    "totale", "subtotale", "iva", "imponibile", "codice", "art", "articolo",
-    "data", "fattura", "documento", "pagina", "pag", "cliente", "fornitore",
-    "indirizzo", "tel", "telefono", "email", "p.iva", "c.f.", "partita",
-    "spedizione", "trasporto", "ordine", "rif", "riferimento", "nr", "numero",
-    "euro", "prezzo", "importo", "sconto", "netto", "lordo", "quantità", "qty",
-    "descrizione", "prodotto", "unità", "misura", "colli", "peso", "note"
+  const KNOWN_GENERA = [
+    "SERRURIA", "LEUCOSPERMUM", "PROTEA", "TELOPEA", "BANKSIA", 
+    "LEUCADENDRON", "GREVILLEA", "HAKEA", "ISOPOGON", "PETROPHILE",
+    "DRYANDRA", "MIMETES", "AULAX", "PARANOMUS", "SPATALLA"
   ];
 
-  const isStopLine = (line: string): boolean => {
-    const lowerLine = line.toLowerCase().trim();
-    if (lowerLine.length < 3) return true;
-    if (/^[\d\s.,€$%]+$/.test(lowerLine)) return true;
-    for (const word of STOP_WORDS) {
-      if (lowerLine.startsWith(word) || lowerLine.includes(word + ":")) {
-        return true;
-      }
+  const SUBTOTAL_PATTERNS = [
+    /talea\s*radicata/i,
+    /piantina\s*radicata/i,
+    /quantit[àa]\s*spedita/i,
+    /totale\s*generale/i,
+    /subtotale/i,
+  ];
+
+  const SKIP_LINE_PATTERNS = [
+    /^documento\s*(di\s*)?trasporto/i,
+    /^causale/i,
+    /^pagamento/i,
+    /^agente/i,
+    /^articolo\s+um\s+q\.?ta/i,
+    /^indicazioni/i,
+    /norme\s*e\s*regole/i,
+    /c\.a\.c\./i,
+    /smaltimento/i,
+  ];
+
+  const isSubtotalLine = (line: string): boolean => {
+    for (const pattern of SUBTOTAL_PATTERNS) {
+      if (pattern.test(line)) return true;
+    }
+    for (const genus of KNOWN_GENERA) {
+      const subtotalPattern = new RegExp(`^${genus}\\s*,\\s*(talea|piantina)`, "i");
+      if (subtotalPattern.test(line.trim())) return true;
     }
     return false;
+  };
+
+  const isSkipLine = (line: string): boolean => {
+    const trimmed = line.trim();
+    if (trimmed.length < 3) return true;
+    if (/^[\d\s.,€$%]+$/.test(trimmed)) return true;
+    for (const pattern of SKIP_LINE_PATTERNS) {
+      if (pattern.test(trimmed)) return true;
+    }
+    return false;
+  };
+
+  const parseQuantity = (text: string): number => {
+    const match = text.match(/(\d{1,3}(?:[.,]\d{3})*|\d+)/);
+    if (!match) return 0;
+    const numStr = match[1].replace(/\./g, "").replace(/,/g, "");
+    return parseInt(numStr) || 0;
+  };
+
+  const extractSpecies = (name: string): string => {
+    const upperName = name.toUpperCase();
+    for (const genus of KNOWN_GENERA) {
+      if (upperName.includes(genus)) {
+        return genus.charAt(0) + genus.slice(1).toLowerCase();
+      }
+    }
+    const matchedVariety = PROTEACEAE_VARIETIES.find(v => 
+      name.toLowerCase().includes(v.toLowerCase().split(" ")[0])
+    );
+    if (matchedVariety) {
+      return matchedVariety.split(" ")[0];
+    }
+    return "Proteaceae";
   };
 
   const parseTextToPlants = (text: string): ScannedPlant[] => {
@@ -76,102 +127,63 @@ export default function DocumentScanScreen({ navigation }: DocumentScanScreenPro
       .map(line => line.replace(/\s+/g, " ").trim())
       .filter(line => line.length > 0);
 
-    const lineData: Array<{ line: string; numbers: Array<{ value: number; position: number }> }> = [];
-
     for (const line of lines) {
-      if (isStopLine(line)) continue;
+      if (isSkipLine(line)) continue;
+      if (isSubtotalLine(line)) continue;
 
-      const numbers: Array<{ value: number; position: number }> = [];
-      const numberMatches = line.matchAll(/\b(\d{1,5})\b/g);
-      for (const match of numberMatches) {
-        const val = parseInt(match[1]);
-        if (val > 0 && val < 100000) {
-          numbers.push({ value: val, position: match.index || 0 });
-        }
-      }
-      lineData.push({ line, numbers });
-    }
-
-    const qtyPositions: number[] = [];
-    for (const { line, numbers } of lineData) {
-      if (numbers.length > 0) {
-        const rightmost = numbers[numbers.length - 1];
-        const relativePos = rightmost.position / Math.max(line.length, 1);
-        if (relativePos > 0.3) {
-          qtyPositions.push(rightmost.position);
-        }
-      }
-    }
-
-    let qtyColumnPos = -1;
-    if (qtyPositions.length >= 2) {
-      qtyPositions.sort((a, b) => a - b);
-      qtyColumnPos = qtyPositions[Math.floor(qtyPositions.length / 2)];
-    }
-
-    let pendingName = "";
-
-    for (const { line, numbers } of lineData) {
-      let quantity = 0;
-      let name = line;
-
-      if (numbers.length > 0) {
-        const rightmost = numbers[numbers.length - 1];
+      const ddtMatch = line.match(/^(\d{6,10})([A-Z][A-Za-z\s®©™''´`\-]+?)(?:\s+NR\s+|\s+)(\d{1,3}(?:[.,]\d{3})*|\d+)\s*$/i);
+      if (ddtMatch) {
+        const variety = ddtMatch[2].trim();
+        const quantity = parseQuantity(ddtMatch[3]);
         
-        const isInQtyColumn = qtyColumnPos === -1 || 
-          Math.abs(rightmost.position - qtyColumnPos) < 15;
-        
-        if (isInQtyColumn || rightmost.position > line.length * 0.4) {
-          quantity = rightmost.value;
-          name = line.substring(0, rightmost.position).trim();
+        if (variety.length >= 3 && quantity > 0) {
+          plants.push({
+            id: generateId(),
+            variety: variety.substring(0, 60),
+            species: extractSpecies(variety),
+            quantity: Math.min(quantity, 99999),
+            selected: true,
+          });
+          continue;
         }
       }
 
-      name = name
-        .replace(/^\d+[\s.:)-]*/g, "")
-        .replace(/\b\d{1,5}\s*(pz|pezzi|unità|vasi|piante|n\.|nr\.?)?\b/gi, "")
-        .replace(/[-–—:,;.]+$/g, "")
-        .replace(/^[-–—:,;.]+/g, "")
-        .trim();
-
-      if (quantity > 0 && name.length >= 3) {
-        const fullName = pendingName ? `${pendingName} ${name}` : name;
-        pendingName = "";
-
-        let species = "Proteaceae";
-        const matchedVariety = PROTEACEAE_VARIETIES.find(v => 
-          fullName.toLowerCase().includes(v.toLowerCase().split(" ")[0])
-        );
-        if (matchedVariety) {
-          species = matchedVariety.split(" ")[0];
+      const nrMatch = line.match(/(.+?)\s+NR\s+(\d{1,3}(?:[.,]\d{3})*|\d+)/i);
+      if (nrMatch) {
+        let variety = nrMatch[1].trim();
+        const quantity = parseQuantity(nrMatch[2]);
+        
+        variety = variety.replace(/^\d{6,10}/, "").trim();
+        
+        if (variety.length >= 3 && quantity > 0 && !isSubtotalLine(variety)) {
+          plants.push({
+            id: generateId(),
+            variety: variety.substring(0, 60),
+            species: extractSpecies(variety),
+            quantity: Math.min(quantity, 99999),
+            selected: true,
+          });
+          continue;
         }
+      }
 
-        plants.push({
-          id: generateId(),
-          variety: fullName.substring(0, 60),
-          species,
-          quantity: Math.min(quantity, 99999),
-          selected: true,
-        });
-      } else if (quantity === 0 && name.length >= 3 && !/^\d+$/.test(name)) {
-        pendingName = pendingName ? `${pendingName} ${name}` : name;
-      } else if (quantity > 0 && pendingName.length >= 3) {
-        let species = "Proteaceae";
-        const matchedVariety = PROTEACEAE_VARIETIES.find(v => 
-          pendingName.toLowerCase().includes(v.toLowerCase().split(" ")[0])
-        );
-        if (matchedVariety) {
-          species = matchedVariety.split(" ")[0];
+      const simpleMatch = line.match(/^(.+?)\s+(\d{1,3}(?:[.,]\d{3})*)\s*$/);
+      if (simpleMatch) {
+        let variety = simpleMatch[1].trim();
+        const quantity = parseQuantity(simpleMatch[2]);
+        
+        variety = variety.replace(/^\d{6,10}/, "").trim();
+        variety = variety.replace(/[-–—:,;.]+$/, "").trim();
+        
+        if (variety.length >= 3 && quantity > 0 && !isSubtotalLine(variety)) {
+          plants.push({
+            id: generateId(),
+            variety: variety.substring(0, 60),
+            species: extractSpecies(variety),
+            quantity: Math.min(quantity, 99999),
+            selected: true,
+          });
         }
-
-        plants.push({
-          id: generateId(),
-          variety: pendingName.substring(0, 60),
-          species,
-          quantity: Math.min(quantity, 99999),
-          selected: true,
-        });
-        pendingName = "";
       }
     }
 
@@ -371,6 +383,24 @@ export default function DocumentScanScreen({ navigation }: DocumentScanScreenPro
     }
   };
 
+  const handlePasteText = () => {
+    if (!pasteText.trim()) return;
+    setRawText(pasteText.trim());
+    const plants = parseTextToPlants(pasteText);
+    setScannedPlants(plants);
+    setShowPasteInput(false);
+    if (plants.length === 0) {
+      setRawText("Nessuna pianta trovata nel testo. Verifica il formato: Nome Pianta + Quantità");
+    }
+  };
+
+  const handleClearAll = () => {
+    setScannedPlants([]);
+    setRawText("");
+    setPasteText("");
+    setShowPasteInput(false);
+  };
+
   const selectedCount = scannedPlants.filter(p => p.selected).length;
 
   const renderPlantItem = ({ item }: { item: ScannedPlant }) => (
@@ -430,49 +460,150 @@ export default function DocumentScanScreen({ navigation }: DocumentScanScreenPro
   return (
     <ThemedView style={styles.container}>
       <ScreenScrollView>
-        <ThemedText type="h4" style={styles.sectionTitle}>
-          Carica Documento
-        </ThemedText>
-        <ThemedText style={[styles.hint, { color: theme.textSecondary }]}>
-          Scatta una foto o carica un file per estrarre automaticamente i dati delle piante
-        </ThemedText>
-
-        <View style={styles.uploadOptions}>
-          {Platform.OS !== "web" && (
-            <Pressable
-              onPress={handleTakePhoto}
-              style={({ pressed }) => [
-                styles.uploadButton,
-                { backgroundColor: theme.primary, opacity: pressed ? 0.8 : 1 },
-              ]}
-            >
-              <Feather name="camera" size={24} color="#FFF" />
-              <ThemedText style={styles.uploadButtonText}>Scatta Foto</ThemedText>
+        <View style={styles.headerRow}>
+          <ThemedText type="h4" style={styles.sectionTitle}>
+            Importa Piante
+          </ThemedText>
+          {(scannedPlants.length > 0 || rawText.length > 0) && (
+            <Pressable onPress={handleClearAll} style={styles.clearButton}>
+              <Feather name="x" size={18} color={theme.textSecondary} />
+              <ThemedText style={{ color: theme.textSecondary, fontSize: 14 }}>
+                Pulisci
+              </ThemedText>
             </Pressable>
           )}
+        </View>
 
+        <View style={styles.methodTabs}>
           <Pressable
-            onPress={handlePickImage}
-            style={({ pressed }) => [
-              styles.uploadButton,
-              { backgroundColor: theme.activityWatering, opacity: pressed ? 0.8 : 1 },
+            onPress={() => setShowPasteInput(false)}
+            style={[
+              styles.methodTab,
+              !showPasteInput && { backgroundColor: theme.primary },
             ]}
           >
-            <Feather name="image" size={24} color="#FFF" />
-            <ThemedText style={styles.uploadButtonText}>Galleria</ThemedText>
+            <Feather 
+              name="camera" 
+              size={16} 
+              color={!showPasteInput ? "#FFF" : theme.text} 
+            />
+            <ThemedText style={[
+              styles.methodTabText,
+              { color: !showPasteInput ? "#FFF" : theme.text }
+            ]}>
+              Scansiona
+            </ThemedText>
           </Pressable>
-
           <Pressable
-            onPress={handlePickDocument}
-            style={({ pressed }) => [
-              styles.uploadButton,
-              { backgroundColor: theme.activityTreatment, opacity: pressed ? 0.8 : 1 },
+            onPress={() => setShowPasteInput(true)}
+            style={[
+              styles.methodTab,
+              showPasteInput && { backgroundColor: theme.primary },
             ]}
           >
-            <Feather name="file-text" size={24} color="#FFF" />
-            <ThemedText style={styles.uploadButtonText}>File</ThemedText>
+            <Feather 
+              name="clipboard" 
+              size={16} 
+              color={showPasteInput ? "#FFF" : theme.text} 
+            />
+            <ThemedText style={[
+              styles.methodTabText,
+              { color: showPasteInput ? "#FFF" : theme.text }
+            ]}>
+              Incolla Lista
+            </ThemedText>
           </Pressable>
         </View>
+
+        {showPasteInput ? (
+          <View style={styles.pasteSection}>
+            <ThemedText style={[styles.hint, { color: theme.textSecondary }]}>
+              Incolla il testo copiato da email, DDT o messaggi. Il sistema riconoscerà automaticamente nomi piante e quantità.
+            </ThemedText>
+            <TextInput
+              value={pasteText}
+              onChangeText={setPasteText}
+              multiline
+              numberOfLines={8}
+              placeholder="Incolla qui la lista piante..."
+              placeholderTextColor={theme.textSecondary}
+              style={[
+                styles.pasteInput,
+                { 
+                  backgroundColor: theme.backgroundDefault, 
+                  borderColor: theme.backgroundSecondary,
+                  color: theme.text,
+                },
+              ]}
+            />
+            <Pressable
+              onPress={handlePasteText}
+              disabled={!pasteText.trim()}
+              style={({ pressed }) => [
+                styles.parseButton,
+                {
+                  backgroundColor: pasteText.trim() ? theme.primary : theme.backgroundSecondary,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              <Feather 
+                name="search" 
+                size={20} 
+                color={pasteText.trim() ? "#FFF" : theme.textSecondary} 
+              />
+              <ThemedText style={[
+                styles.parseButtonText,
+                { color: pasteText.trim() ? "#FFF" : theme.textSecondary }
+              ]}>
+                Analizza Testo
+              </ThemedText>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            <ThemedText style={[styles.hint, { color: theme.textSecondary }]}>
+              Scatta una foto o carica un file (TXT/CSV) per estrarre automaticamente i dati delle piante
+            </ThemedText>
+
+            <View style={styles.uploadOptions}>
+              {Platform.OS !== "web" && (
+                <Pressable
+                  onPress={handleTakePhoto}
+                  style={({ pressed }) => [
+                    styles.uploadButton,
+                    { backgroundColor: theme.primary, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                >
+                  <Feather name="camera" size={24} color="#FFF" />
+                  <ThemedText style={styles.uploadButtonText}>Scatta Foto</ThemedText>
+                </Pressable>
+              )}
+
+              <Pressable
+                onPress={handlePickImage}
+                style={({ pressed }) => [
+                  styles.uploadButton,
+                  { backgroundColor: theme.activityWatering, opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <Feather name="image" size={24} color="#FFF" />
+                <ThemedText style={styles.uploadButtonText}>Galleria</ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={handlePickDocument}
+                style={({ pressed }) => [
+                  styles.uploadButton,
+                  { backgroundColor: theme.activityTreatment, opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <Feather name="file-text" size={24} color="#FFF" />
+                <ThemedText style={styles.uploadButtonText}>File</ThemedText>
+              </Pressable>
+            </View>
+          </>
+        )}
 
         {isProcessing && (
           <View style={styles.processingContainer}>
@@ -630,11 +761,66 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  clearButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    padding: Spacing.sm,
+  },
   sectionTitle: {
-    marginBottom: Spacing.sm,
+    marginBottom: 0,
   },
   sectionSubtitle: {
     marginBottom: Spacing.sm,
+  },
+  methodTabs: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  methodTab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
+  methodTabText: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  pasteSection: {
+    marginBottom: Spacing.lg,
+  },
+  pasteInput: {
+    minHeight: 150,
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    fontSize: 14,
+    textAlignVertical: "top",
+    marginBottom: Spacing.md,
+  },
+  parseButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  parseButtonText: {
+    fontWeight: "600",
+    fontSize: 16,
   },
   hint: {
     fontSize: 14,
