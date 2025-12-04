@@ -223,6 +223,24 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         </ThemedText>
       </Pressable>
 
+      <Spacer height={Spacing.lg} />
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.saveButton,
+          {
+            backgroundColor: theme.activityWatering,
+            opacity: pressed ? 0.8 : 1,
+          },
+        ]}
+        onPress={() => navigation.navigate("DocumentScan")}
+      >
+        <Feather name="camera" size={20} color="#FFFFFF" />
+        <ThemedText style={styles.saveButtonText}>
+          Scansiona Documento
+        </ThemedText>
+      </Pressable>
+
       <Spacer height={Spacing["3xl"]} />
 
       <ThemedText type="h4" style={styles.sectionTitle}>

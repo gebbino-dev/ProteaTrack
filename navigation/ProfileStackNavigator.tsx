@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ProfileScreen from "@/screens/ProfileScreen";
 import ConfigureGreenhouseScreen from "@/screens/ConfigureGreenhouseScreen";
 import PlantInventoryScreen from "@/screens/PlantInventoryScreen";
+import DocumentScanScreen from "@/screens/DocumentScanScreen";
 import { useTheme } from "@/hooks/useTheme";
 import { getCommonScreenOptions } from "@/navigation/screenOptions";
 
@@ -10,6 +11,7 @@ export type ProfileStackParamList = {
   Profile: undefined;
   ConfigureGreenhouse: undefined;
   PlantInventory: undefined;
+  DocumentScan: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -38,6 +40,13 @@ export default function ProfileStackNavigator() {
         component={PlantInventoryScreen}
         options={{
           title: "Inventario Piante",
+        }}
+      />
+      <Stack.Screen
+        name="DocumentScan"
+        component={DocumentScanScreen}
+        options={{
+          title: "Scansione Documenti",
         }}
       />
     </Stack.Navigator>
