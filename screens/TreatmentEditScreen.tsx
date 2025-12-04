@@ -20,7 +20,7 @@ export default function TreatmentEditScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const { theme } = useTheme();
-  const { treatmentId } = route.params || {};
+  const { treatmentId, greenhouse: presetGreenhouse, sector: presetSector, bench: presetBench } = route.params || {};
   
   const [loading, setLoading] = useState(!!treatmentId);
   const [saving, setSaving] = useState(false);
@@ -81,6 +81,13 @@ export default function TreatmentEditScreen() {
           });
           setCreateActivity(false);
         }
+      } else if (presetGreenhouse !== undefined || presetSector !== undefined) {
+        setForm(prev => ({
+          ...prev,
+          greenhouse: presetGreenhouse ?? null,
+          sector: presetSector ?? null,
+          bench: presetBench ?? null,
+        }));
       }
     } catch (error) {
       console.error('Error loading data:', error);

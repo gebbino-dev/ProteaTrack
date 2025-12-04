@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Pressable, TextInput, Alert, Platform } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, StyleSheet, Pressable, TextInput, Alert, ActivityIndicator } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RouteProp } from "@react-navigation/native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenKeyboardAwareScrollView } from "@/components/ScreenKeyboardAwareScrollView";
 import { ThemedText } from "@/components/ThemedText";
@@ -14,9 +13,8 @@ import { storage } from "@/utils/storage";
 import {
   ACTIVITY_TYPES,
   ActivityType,
-  GREENHOUSES,
-  SECTORS_PER_GREENHOUSE,
-  BENCHES,
+  GreenhouseConfig,
+  Greenhouse,
 } from "@/types";
 import { DashboardStackParamList } from "@/navigation/DashboardStackNavigator";
 
@@ -29,32 +27,69 @@ export default function RecordActivityScreen({
   navigation,
   route,
 }: RecordActivityScreenProps) {
-  const { theme, isDark } = useTheme();
-  const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const preselected = route.params || {};
 
+  const [config, setConfig] = useState<GreenhouseConfig | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activityType, setActivityType] = useState<ActivityType>("innaffiatura");
-  const [greenhouse, setGreenhouse] = useState<number>(preselected.greenhouse || 1);
-  const [sector, setSector] = useState<number>(preselected.sector || SECTORS_PER_GREENHOUSE[1][0]);
-  const [bench, setBench] = useState<string>(preselected.bench || "B1");
+  const [greenhouse, setGreenhouse] = useState<number | null>(preselected.greenhouse || null);
+  const [sector, setSector] = useState<number | null>(preselected.sector || null);
+  const [bench, setBench] = useState<string | null>(preselected.bench || null);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (preselected.greenhouse) {
-      setGreenhouse(preselected.greenhouse);
-    }
-    if (preselected.sector) {
-      setSector(preselected.sector);
-    }
-    if (preselected.bench) {
-      setBench(preselected.bench);
-    }
-  }, [preselected]);
+    loadConfig();
+  }, []);
 
-  const sectors = SECTORS_PER_GREENHOUSE[greenhouse] || [];
+  const loadConfig = async () => {
+    try {
+      const cfg = await storage.getGreenhouseConfig();
+      setConfig(cfg);
+      
+      if (!preselected.greenhouse && cfg.greenhouses.length > 0) {
+        const firstGh = cfg.greenhouses[0];
+        setGreenhouse(firstGh.id);
+        if (firstGh.sectors.length > 0) {
+          setSector(firstGh.sectors[0].id);
+        }
+        if (firstGh.benchNames && firstGh.benchNames.length > 0) {
+          setBench(firstGh.benchNames[0]);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading config:", error);
+      Alert.alert("Errore", "Impossibile caricare la configurazione");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getCurrentGreenhouse = useCallback((): Greenhouse | undefined => {
+    if (!config || greenhouse === null) return undefined;
+    return config.greenhouses.find(g => g.id === greenhouse);
+  }, [config, greenhouse]);
+
+  const currentGh = getCurrentGreenhouse();
+  const sectors = currentGh?.sectors || [];
+  const benches = currentGh?.benchNames || ['B1', 'B2', 'B3', 'B4', 'B5'];
+
+  const handleGreenhouseChange = (ghId: number) => {
+    setGreenhouse(ghId);
+    const gh = config?.greenhouses.find(g => g.id === ghId);
+    if (gh) {
+      setSector(gh.sectors.length > 0 ? gh.sectors[0].id : null);
+      setBench(gh.benchNames && gh.benchNames.length > 0 ? gh.benchNames[0] : 'B1');
+    }
+  };
 
   const handleSave = async () => {
+    if (greenhouse === null || sector === null || bench === null) {
+      Alert.alert("Errore", "Seleziona serra, settore e bancale");
+      return;
+    }
+
     setSaving(true);
     try {
       await storage.saveActivity({
@@ -62,6 +97,8 @@ export default function RecordActivityScreen({
         greenhouse,
         sector,
         bench,
+        locationType: 'serra',
+        customLocation: '',
         date: new Date().toISOString(),
         notes,
       });
@@ -88,6 +125,22 @@ export default function RecordActivityScreen({
         return theme.activityOther;
     }
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.backgroundRoot }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
+  if (!config) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.backgroundRoot }]}>
+        <ThemedText>Errore nel caricamento</ThemedText>
+      </View>
+    );
+  }
 
   return (
     <ScreenKeyboardAwareScrollView>
@@ -149,25 +202,22 @@ export default function RecordActivityScreen({
         Serra
       </ThemedText>
       <View style={styles.optionsRow}>
-        {GREENHOUSES.map((g) => (
+        {config.greenhouses.map((g) => (
           <Pressable
-            key={g}
+            key={g.id}
             style={[
               styles.optionButton,
               {
                 backgroundColor:
-                  greenhouse === g ? theme.primary : theme.backgroundDefault,
+                  greenhouse === g.id ? theme.primary : theme.backgroundDefault,
               },
             ]}
-            onPress={() => {
-              setGreenhouse(g);
-              setSector(SECTORS_PER_GREENHOUSE[g][0]);
-            }}
+            onPress={() => handleGreenhouseChange(g.id)}
           >
             <ThemedText
-              style={{ color: greenhouse === g ? "#FFFFFF" : theme.text }}
+              style={{ color: greenhouse === g.id ? "#FFFFFF" : theme.text }}
             >
-              Serra {g}
+              {g.customName || `Serra ${g.id}`}
             </ThemedText>
           </Pressable>
         ))}
@@ -181,23 +231,23 @@ export default function RecordActivityScreen({
       <View style={styles.sectorGrid}>
         {sectors.map((s) => (
           <Pressable
-            key={s}
+            key={s.id}
             style={[
               styles.sectorButton,
               {
                 backgroundColor:
-                  sector === s ? theme.primary : theme.backgroundDefault,
+                  sector === s.id ? theme.primary : theme.backgroundDefault,
               },
             ]}
-            onPress={() => setSector(s)}
+            onPress={() => setSector(s.id)}
           >
             <ThemedText
               style={[
                 styles.sectorText,
-                { color: sector === s ? "#FFFFFF" : theme.text },
+                { color: sector === s.id ? "#FFFFFF" : theme.text },
               ]}
             >
-              {s}
+              {s.id}
             </ThemedText>
           </Pressable>
         ))}
@@ -209,7 +259,7 @@ export default function RecordActivityScreen({
         Bancale
       </ThemedText>
       <View style={styles.optionsRow}>
-        {BENCHES.map((b) => (
+        {benches.map((b) => (
           <Pressable
             key={b}
             style={[
@@ -278,6 +328,11 @@ export default function RecordActivityScreen({
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   sectionTitle: {
     marginBottom: Spacing.xs,
   },

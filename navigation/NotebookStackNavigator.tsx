@@ -8,7 +8,12 @@ import { getCommonScreenOptions } from "@/navigation/screenOptions";
 
 export type NotebookStackParamList = {
   TreatmentList: undefined;
-  TreatmentEdit: { treatmentId?: string } | undefined;
+  TreatmentEdit: { 
+    treatmentId?: string;
+    greenhouse?: number;
+    sector?: number;
+    bench?: string;
+  } | undefined;
 };
 
 const Stack = createNativeStackNavigator<NotebookStackParamList>();

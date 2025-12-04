@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, CommonActions } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RouteProp } from "@react-navigation/native";
 
@@ -21,8 +21,24 @@ type SectorListScreenProps = {
 export default function SectorListScreen({ navigation, route }: SectorListScreenProps) {
   const { greenhouse: greenhouseId } = route.params;
   const { theme } = useTheme();
+  const rootNavigation = useNavigation();
   const [benchData, setBenchData] = useState<Bench[]>([]);
   const [config, setConfig] = useState<GreenhouseConfig | null>(null);
+
+  const navigateToTreatment = (sectorId: number) => {
+    rootNavigation.dispatch(
+      CommonActions.navigate({
+        name: 'NotebookTab',
+        params: {
+          screen: 'TreatmentEdit',
+          params: {
+            greenhouse: greenhouseId,
+            sector: sectorId,
+          },
+        },
+      })
+    );
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -69,24 +85,36 @@ export default function SectorListScreen({ navigation, route }: SectorListScreen
               const stats = getSectorStats(sector.id);
               return (
                 <View key={sector.id} style={styles.sectorWrapper}>
-                  <Pressable
-                    style={({ pressed }) => [
+                  <View
+                    style={[
                       styles.sectorCard,
                       { backgroundColor: theme.backgroundDefault },
-                      pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
                     ]}
-                    onPress={() => {}}
                   >
-                    <ThemedText type="h4" style={styles.sectorTitle}>
-                      {sector.customName || `Settore ${sector.id}`}
-                    </ThemedText>
-                    <ThemedText
-                      style={{ color: theme.textSecondary, fontSize: 12, marginBottom: Spacing.sm }}
-                    >
-                      {stats.plantCount} piante - {stats.activeBenches}/{benchNames.length} bancali
-                    </ThemedText>
+                    <View style={styles.sectorHeader}>
+                      <View style={{ flex: 1 }}>
+                        <ThemedText type="h4" style={styles.sectorTitle}>
+                          {sector.customName || `Settore ${sector.id}`}
+                        </ThemedText>
+                        <ThemedText
+                          style={{ color: theme.textSecondary, fontSize: 12 }}
+                        >
+                          {stats.plantCount} piante - {stats.activeBenches}/{benchNames.length} bancali
+                        </ThemedText>
+                      </View>
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.treatmentButton,
+                          { backgroundColor: theme.activityTreatment },
+                          pressed && { opacity: 0.7 },
+                        ]}
+                        onPress={() => navigateToTreatment(sector.id)}
+                      >
+                        <Feather name="shield" size={14} color="#FFFFFF" />
+                      </Pressable>
+                    </View>
 
-                    <View style={styles.benchesRow}>
+                    <View style={[styles.benchesRow, { marginTop: Spacing.sm }]}>
                       {benchNames.map((benchName) => {
                         const benchInfo = benchData.find(
                           (b) => b.sector === sector.id && b.benchNumber === benchName
@@ -125,7 +153,7 @@ export default function SectorListScreen({ navigation, route }: SectorListScreen
                         );
                       })}
                     </View>
-                  </Pressable>
+                  </View>
                 </View>
               );
             })}
@@ -153,9 +181,21 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
   },
+  sectorHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
   sectorTitle: {
     fontSize: 16,
     marginBottom: Spacing.xs,
+  },
+  treatmentButton: {
+    width: 28,
+    height: 28,
+    borderRadius: BorderRadius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: Spacing.xs,
   },
   benchesRow: {
     flexDirection: "row",
