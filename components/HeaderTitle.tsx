@@ -6,16 +6,19 @@ import { Spacing } from "@/constants/theme";
 
 interface HeaderTitleProps {
   title: string;
+  showIcon?: boolean;
 }
 
-export function HeaderTitle({ title }: HeaderTitleProps) {
+export function HeaderTitle({ title, showIcon = true }: HeaderTitleProps) {
   return (
     <View style={styles.container}>
-      <Image
-        source={require("../assets/images/icon.png")}
-        style={styles.icon}
-        resizeMode="contain"
-      />
+      {showIcon ? (
+        <Image
+          source={require("../assets/images/icon.png")}
+          style={styles.icon}
+          resizeMode="contain"
+        />
+      ) : null}
       <ThemedText style={styles.title}>{title}</ThemedText>
     </View>
   );

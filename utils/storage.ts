@@ -1,5 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Activity, Bench, UserSettings, GreenhouseConfig, DEFAULT_GREENHOUSE_CONFIG, PlantRecord, PlantInventory } from '@/types';
+import { 
+  Activity, 
+  Bench, 
+  UserSettings, 
+  GreenhouseConfig, 
+  DEFAULT_GREENHOUSE_CONFIG, 
+  PlantRecord, 
+  PlantInventory,
+  Transaction,
+  TransactionCategory,
+  DEFAULT_CATEGORIES,
+  Treatment,
+  PhytosanitaryProduct,
+  FinancialSummary,
+  TransactionType,
+} from '@/types';
 
 const KEYS = {
   ACTIVITIES: 'serra_activities',
@@ -7,6 +22,10 @@ const KEYS = {
   SETTINGS: 'serra_settings',
   GREENHOUSE_CONFIG: 'serra_greenhouse_config',
   PLANT_INVENTORY: 'serra_plant_inventory',
+  TRANSACTIONS: 'serra_transactions',
+  CATEGORIES: 'serra_categories',
+  TREATMENTS: 'serra_treatments',
+  PRODUCTS: 'serra_products',
 };
 
 export const generateId = (): string => {
@@ -132,6 +151,7 @@ export const storage = {
       variety: '',
       plantingDate: '',
       notes: '',
+      placche: 0,
     };
   },
 
@@ -225,6 +245,7 @@ export const storage = {
             variety: '',
             plantingDate: '',
             notes: '',
+            placche: 0,
           });
         }
       }
@@ -271,9 +292,320 @@ export const storage = {
 
   async clearAllData(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([KEYS.ACTIVITIES, KEYS.BENCHES, KEYS.SETTINGS, KEYS.PLANT_INVENTORY]);
+      await AsyncStorage.multiRemove([
+        KEYS.ACTIVITIES, 
+        KEYS.BENCHES, 
+        KEYS.SETTINGS, 
+        KEYS.PLANT_INVENTORY,
+        KEYS.TRANSACTIONS,
+        KEYS.CATEGORIES,
+        KEYS.TREATMENTS,
+        KEYS.PRODUCTS,
+      ]);
     } catch (error) {
       console.error('Error clearing data:', error);
+      throw error;
+    }
+  },
+
+  // ============================================
+  // GESTIONALE CONTABILE (Accounting Functions)
+  // ============================================
+
+  async getCategories(): Promise<TransactionCategory[]> {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.CATEGORIES);
+      if (data) {
+        return JSON.parse(data);
+      }
+      await AsyncStorage.setItem(KEYS.CATEGORIES, JSON.stringify(DEFAULT_CATEGORIES));
+      return DEFAULT_CATEGORIES;
+    } catch (error) {
+      console.error('Error getting categories:', error);
+      return DEFAULT_CATEGORIES;
+    }
+  },
+
+  async saveCategory(category: Omit<TransactionCategory, 'id'>): Promise<TransactionCategory> {
+    try {
+      const categories = await this.getCategories();
+      const newCategory: TransactionCategory = {
+        ...category,
+        id: generateId(),
+      };
+      categories.push(newCategory);
+      await AsyncStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
+      return newCategory;
+    } catch (error) {
+      console.error('Error saving category:', error);
+      throw error;
+    }
+  },
+
+  async getTransactions(): Promise<Transaction[]> {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.TRANSACTIONS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error getting transactions:', error);
+      return [];
+    }
+  },
+
+  async saveTransaction(transaction: Omit<Transaction, 'id' | 'createdAt'>): Promise<Transaction> {
+    try {
+      const transactions = await this.getTransactions();
+      const newTransaction: Transaction = {
+        ...transaction,
+        id: generateId(),
+        createdAt: new Date().toISOString(),
+      };
+      transactions.unshift(newTransaction);
+      await AsyncStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
+      return newTransaction;
+    } catch (error) {
+      console.error('Error saving transaction:', error);
+      throw error;
+    }
+  },
+
+  async updateTransaction(id: string, updates: Partial<Transaction>): Promise<Transaction | null> {
+    try {
+      const transactions = await this.getTransactions();
+      const index = transactions.findIndex(t => t.id === id);
+      if (index < 0) return null;
+      
+      const updated = { ...transactions[index], ...updates };
+      transactions[index] = updated;
+      await AsyncStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(transactions));
+      return updated;
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+      throw error;
+    }
+  },
+
+  async deleteTransaction(id: string): Promise<void> {
+    try {
+      const transactions = await this.getTransactions();
+      const filtered = transactions.filter(t => t.id !== id);
+      await AsyncStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(filtered));
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      throw error;
+    }
+  },
+
+  async getTransactionsByPeriod(year: number, month?: number): Promise<Transaction[]> {
+    const transactions = await this.getTransactions();
+    return transactions.filter(t => {
+      const date = new Date(t.date);
+      if (month !== undefined) {
+        return date.getFullYear() === year && date.getMonth() === month;
+      }
+      return date.getFullYear() === year;
+    });
+  },
+
+  async getFinancialSummary(year: number, month?: number): Promise<FinancialSummary> {
+    const transactions = await this.getTransactionsByPeriod(year, month);
+    const categories = await this.getCategories();
+    
+    let income = 0;
+    let expenses = 0;
+    const categoryTotals: { [key: string]: number } = {};
+    
+    for (const t of transactions) {
+      if (t.type === 'ricavo') {
+        income += t.amount;
+      } else {
+        expenses += t.amount;
+      }
+      categoryTotals[t.categoryId] = (categoryTotals[t.categoryId] || 0) + t.amount;
+    }
+    
+    const byCategory = Object.entries(categoryTotals).map(([categoryId, total]) => ({
+      categoryId,
+      total,
+    })).sort((a, b) => b.total - a.total);
+    
+    return {
+      period: month !== undefined ? `${year}-${String(month + 1).padStart(2, '0')}` : String(year),
+      income,
+      expenses,
+      margin: income - expenses,
+      byCategory,
+    };
+  },
+
+  async exportTransactionsAsCSV(year: number, month?: number): Promise<string> {
+    try {
+      const transactions = await this.getTransactionsByPeriod(year, month);
+      const categories = await this.getCategories();
+      
+      const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name || 'Altro';
+      
+      let csv = 'Data,Tipo,Categoria,Importo,Controparte,Descrizione,Rif. Documento,Note\n';
+      
+      for (const t of transactions) {
+        const date = t.date;
+        const tipo = t.type === 'ricavo' ? 'Entrata' : 'Uscita';
+        const categoria = getCategoryName(t.categoryId).replace(/,/g, ';');
+        const importo = t.amount.toFixed(2);
+        const controparte = (t.counterparty || '').replace(/,/g, ';');
+        const descrizione = (t.description || '').replace(/,/g, ';');
+        const docRef = (t.docRef || '').replace(/,/g, ';');
+        const note = (t.notes || '').replace(/,/g, ';').replace(/\n/g, ' ');
+        
+        csv += `"${date}","${tipo}","${categoria}",${importo},"${controparte}","${descrizione}","${docRef}","${note}"\n`;
+      }
+      
+      const summary = await this.getFinancialSummary(year, month);
+      csv += `\nTOTALE ENTRATE,,,${summary.income.toFixed(2)},,,,\n`;
+      csv += `TOTALE USCITE,,,${summary.expenses.toFixed(2)},,,,\n`;
+      csv += `MARGINE,,,${summary.margin.toFixed(2)},,,,\n`;
+      
+      return csv;
+    } catch (error) {
+      console.error('Error exporting transactions CSV:', error);
+      throw error;
+    }
+  },
+
+  // ============================================
+  // QUADERNO DI CAMPAGNA (Field Notebook Functions)
+  // ============================================
+
+  async getProducts(): Promise<PhytosanitaryProduct[]> {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.PRODUCTS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error getting products:', error);
+      return [];
+    }
+  },
+
+  async saveProduct(product: Omit<PhytosanitaryProduct, 'id'>): Promise<PhytosanitaryProduct> {
+    try {
+      const products = await this.getProducts();
+      const newProduct: PhytosanitaryProduct = {
+        ...product,
+        id: generateId(),
+      };
+      products.push(newProduct);
+      await AsyncStorage.setItem(KEYS.PRODUCTS, JSON.stringify(products));
+      return newProduct;
+    } catch (error) {
+      console.error('Error saving product:', error);
+      throw error;
+    }
+  },
+
+  async deleteProduct(id: string): Promise<void> {
+    try {
+      const products = await this.getProducts();
+      const filtered = products.filter(p => p.id !== id);
+      await AsyncStorage.setItem(KEYS.PRODUCTS, JSON.stringify(filtered));
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      throw error;
+    }
+  },
+
+  async getTreatments(): Promise<Treatment[]> {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.TREATMENTS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error getting treatments:', error);
+      return [];
+    }
+  },
+
+  async saveTreatment(treatment: Omit<Treatment, 'id' | 'createdAt'>): Promise<Treatment> {
+    try {
+      const treatments = await this.getTreatments();
+      const newTreatment: Treatment = {
+        ...treatment,
+        id: generateId(),
+        createdAt: new Date().toISOString(),
+      };
+      treatments.unshift(newTreatment);
+      await AsyncStorage.setItem(KEYS.TREATMENTS, JSON.stringify(treatments));
+      return newTreatment;
+    } catch (error) {
+      console.error('Error saving treatment:', error);
+      throw error;
+    }
+  },
+
+  async updateTreatment(id: string, updates: Partial<Treatment>): Promise<Treatment | null> {
+    try {
+      const treatments = await this.getTreatments();
+      const index = treatments.findIndex(t => t.id === id);
+      if (index < 0) return null;
+      
+      const updated = { ...treatments[index], ...updates };
+      treatments[index] = updated;
+      await AsyncStorage.setItem(KEYS.TREATMENTS, JSON.stringify(treatments));
+      return updated;
+    } catch (error) {
+      console.error('Error updating treatment:', error);
+      throw error;
+    }
+  },
+
+  async deleteTreatment(id: string): Promise<void> {
+    try {
+      const treatments = await this.getTreatments();
+      const filtered = treatments.filter(t => t.id !== id);
+      await AsyncStorage.setItem(KEYS.TREATMENTS, JSON.stringify(filtered));
+    } catch (error) {
+      console.error('Error deleting treatment:', error);
+      throw error;
+    }
+  },
+
+  async getTreatmentsByLocation(greenhouse?: number, sector?: number, bench?: string): Promise<Treatment[]> {
+    const treatments = await this.getTreatments();
+    return treatments.filter(t => {
+      if (greenhouse !== undefined && t.greenhouse !== greenhouse) return false;
+      if (sector !== undefined && t.sector !== sector) return false;
+      if (bench !== undefined && t.bench !== bench) return false;
+      return true;
+    });
+  },
+
+  async exportTreatmentsAsCSV(): Promise<string> {
+    try {
+      const treatments = await this.getTreatments();
+      
+      let csv = 'Data,Prodotto,Dose (g/hl),Acqua (L),Ubicazione,Avversità,Condizioni Meteo,Note\n';
+      
+      for (const t of treatments) {
+        const date = t.date;
+        const prodotto = (t.productName || '').replace(/,/g, ';');
+        const dose = t.dosePerHl;
+        const acqua = t.waterLiters;
+        let ubicazione = '';
+        if (t.locationType === 'serra' && t.greenhouse) {
+          ubicazione = `Serra ${t.greenhouse}`;
+          if (t.sector) ubicazione += ` - Sett. ${t.sector}`;
+          if (t.bench) ubicazione += ` - ${t.bench}`;
+        } else {
+          ubicazione = t.customLocation || 'Campo aperto';
+        }
+        const avversita = (t.targetPest || '').replace(/,/g, ';');
+        const meteo = (t.weatherConditions || '').replace(/,/g, ';');
+        const note = (t.notes || '').replace(/,/g, ';').replace(/\n/g, ' ');
+        
+        csv += `"${date}","${prodotto}",${dose},${acqua},"${ubicazione}","${avversita}","${meteo}","${note}"\n`;
+      }
+      
+      return csv;
+    } catch (error) {
+      console.error('Error exporting treatments CSV:', error);
       throw error;
     }
   },

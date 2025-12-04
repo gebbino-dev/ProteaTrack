@@ -7,12 +7,15 @@ import DashboardStackNavigator from "@/navigation/DashboardStackNavigator";
 import GreenhouseStackNavigator from "@/navigation/GreenhouseStackNavigator";
 import CalendarStackNavigator from "@/navigation/CalendarStackNavigator";
 import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
+import AccountingStackNavigator from "@/navigation/AccountingStackNavigator";
+import NotebookStackNavigator from "@/navigation/NotebookStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
 
 export type MainTabParamList = {
   DashboardTab: undefined;
   GreenhouseTab: undefined;
-  CalendarTab: undefined;
+  AccountingTab: undefined;
+  NotebookTab: undefined;
   ProfileTab: undefined;
 };
 
@@ -68,12 +71,22 @@ export default function MainTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="CalendarTab"
-        component={CalendarStackNavigator}
+        name="AccountingTab"
+        component={AccountingStackNavigator}
         options={{
-          title: "Calendario",
+          title: "Gestione",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="calendar" size={size} color={color} />
+            <Feather name="dollar-sign" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="NotebookTab"
+        component={NotebookStackNavigator}
+        options={{
+          title: "Quaderno",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="book-open" size={size} color={color} />
           ),
         }}
       />

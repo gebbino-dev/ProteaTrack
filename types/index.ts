@@ -64,6 +64,106 @@ export interface UserSettings {
   location: string;
 }
 
+// ============================================
+// GESTIONALE CONTABILE (Accounting Types)
+// ============================================
+
+export type TransactionType = 'ricavo' | 'costo';
+
+export interface TransactionCategory {
+  id: string;
+  name: string;
+  type: TransactionType;
+  icon: string;
+  color: string;
+}
+
+export interface Transaction {
+  id: string;
+  type: TransactionType;
+  categoryId: string;
+  amount: number;
+  date: string;
+  counterparty: string;
+  description: string;
+  docRef?: string;
+  docType?: string;
+  vatRate?: number;
+  notes: string;
+  source: 'manual' | 'ocr' | 'import';
+  createdAt: string;
+}
+
+export interface FinancialSummary {
+  period: string;
+  income: number;
+  expenses: number;
+  margin: number;
+  byCategory: { categoryId: string; total: number }[];
+}
+
+// ============================================
+// QUADERNO DI CAMPAGNA (Field Notebook Types)
+// ============================================
+
+export interface PhytosanitaryProduct {
+  id: string;
+  name: string;
+  activeIngredient?: string;
+  formulation?: string;
+  registrationNumber?: string;
+  phiDays?: number;
+  fracCode?: string;
+  notes: string;
+}
+
+export interface Treatment {
+  id: string;
+  greenhouse: number | null;
+  sector: number | null;
+  bench: string | null;
+  locationType: LocationType;
+  customLocation: string;
+  productId: string;
+  productName: string;
+  dosePerHl: number;
+  waterLiters: number;
+  areaM2?: number;
+  targetPest?: string;
+  date: string;
+  weatherConditions?: string;
+  notes: string;
+  linkedActivityId?: string;
+  externalId?: string;
+  createdAt: string;
+}
+
+// Default categories for accounting
+export const DEFAULT_EXPENSE_CATEGORIES: TransactionCategory[] = [
+  { id: 'cat_materiali', name: 'Materiali', type: 'costo', icon: 'package', color: '#8B4513' },
+  { id: 'cat_manodopera', name: 'Manodopera', type: 'costo', icon: 'users', color: '#2196F3' },
+  { id: 'cat_fitofarmaci', name: 'Fitofarmaci', type: 'costo', icon: 'shield', color: '#9C27B0' },
+  { id: 'cat_fertilizzanti', name: 'Fertilizzanti', type: 'costo', icon: 'droplet', color: '#4CAF50' },
+  { id: 'cat_piante', name: 'Acquisto Piante', type: 'costo', icon: 'feather', color: '#FF9800' },
+  { id: 'cat_utenze', name: 'Utenze', type: 'costo', icon: 'zap', color: '#FFC107' },
+  { id: 'cat_manutenzione', name: 'Manutenzione', type: 'costo', icon: 'tool', color: '#607D8B' },
+  { id: 'cat_carburante', name: 'Carburante', type: 'costo', icon: 'truck', color: '#795548' },
+  { id: 'cat_altro_costo', name: 'Altro', type: 'costo', icon: 'more-horizontal', color: '#9E9E9E' },
+];
+
+export const DEFAULT_REVENUE_CATEGORIES: TransactionCategory[] = [
+  { id: 'cat_vendita_piante', name: 'Vendita Piante', type: 'ricavo', icon: 'shopping-bag', color: '#4CAF50' },
+  { id: 'cat_vendita_fiori', name: 'Vendita Fiori Recisi', type: 'ricavo', icon: 'gift', color: '#E91E63' },
+  { id: 'cat_servizi', name: 'Servizi', type: 'ricavo', icon: 'briefcase', color: '#3F51B5' },
+  { id: 'cat_contributi', name: 'Contributi/Sussidi', type: 'ricavo', icon: 'award', color: '#00BCD4' },
+  { id: 'cat_altro_ricavo', name: 'Altro', type: 'ricavo', icon: 'more-horizontal', color: '#9E9E9E' },
+];
+
+export const DEFAULT_CATEGORIES: TransactionCategory[] = [
+  ...DEFAULT_EXPENSE_CATEGORIES,
+  ...DEFAULT_REVENUE_CATEGORIES,
+];
+
 export interface GreenhouseStats {
   totalPlants: number;
   activeSectors: number;
