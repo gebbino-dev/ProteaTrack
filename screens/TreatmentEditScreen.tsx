@@ -32,7 +32,7 @@ export default function TreatmentEditScreen() {
   const [form, setForm] = useState({
     locationType: 'serra' as LocationType,
     greenhouse: null as number | null,
-    sector: null as number | null,
+    sectors: [] as number[],
     bench: null as string | null,
     customLocation: '',
     productId: '',
@@ -66,7 +66,7 @@ export default function TreatmentEditScreen() {
           setForm({
             locationType: tx.locationType,
             greenhouse: tx.greenhouse,
-            sector: tx.sector,
+            sectors: tx.sector ? [tx.sector] : [],
             bench: tx.bench,
             customLocation: tx.customLocation,
             productId: tx.productId,
@@ -85,7 +85,7 @@ export default function TreatmentEditScreen() {
         setForm(prev => ({
           ...prev,
           greenhouse: presetGreenhouse ?? null,
-          sector: presetSector ?? null,
+          sectors: presetSector !== undefined ? [presetSector] : [],
           bench: presetBench ?? null,
         }));
       }
@@ -109,13 +109,17 @@ export default function TreatmentEditScreen() {
       Alert.alert('Errore', 'Inserisci i litri di acqua');
       return;
     }
+    if (form.locationType === 'serra' && form.sectors.length === 0 && !form.greenhouse) {
+      Alert.alert('Errore', 'Seleziona almeno una ubicazione');
+      return;
+    }
 
     try {
       setSaving(true);
-      const data: Omit<Treatment, 'id' | 'createdAt'> = {
+      
+      const baseData = {
         locationType: form.locationType,
         greenhouse: form.greenhouse,
-        sector: form.sector,
         bench: form.bench,
         customLocation: form.customLocation.trim(),
         productId: form.productId,
@@ -130,21 +134,31 @@ export default function TreatmentEditScreen() {
       };
 
       if (treatmentId) {
-        await storage.updateTreatment(treatmentId, data);
+        await storage.updateTreatment(treatmentId, {
+          ...baseData,
+          sector: form.sectors.length > 0 ? form.sectors[0] : null,
+        });
       } else {
-        const treatment = await storage.saveTreatment(data);
+        const sectorsToSave = form.sectors.length > 0 ? form.sectors : [null];
         
-        if (createActivity) {
-          await storage.saveActivity({
-            type: 'trattamento',
-            greenhouse: form.greenhouse,
-            sector: form.sector,
-            bench: form.bench,
-            locationType: form.locationType,
-            customLocation: form.customLocation,
-            date: form.date,
-            notes: `${form.productName} - ${form.dosePerHl}g/hl - ${form.waterLiters}L${form.targetPest ? ` - ${form.targetPest}` : ''}`,
+        for (const sector of sectorsToSave) {
+          const treatment = await storage.saveTreatment({
+            ...baseData,
+            sector,
           });
+          
+          if (createActivity) {
+            await storage.saveActivity({
+              type: 'trattamento',
+              greenhouse: form.greenhouse,
+              sector,
+              bench: form.bench,
+              locationType: form.locationType,
+              customLocation: form.customLocation,
+              date: form.date,
+              notes: `${form.productName} - ${form.dosePerHl}g/hl - ${form.waterLiters}L${form.targetPest ? ` - ${form.targetPest}` : ''}`,
+            });
+          }
         }
       }
       
@@ -168,9 +182,17 @@ export default function TreatmentEditScreen() {
     if (config) {
       const gh = config.greenhouses.find(g => g.id === form.greenhouse);
       location = gh?.customName || `Serra ${form.greenhouse}`;
-    }
-    if (form.sector) {
-      location += ` - Sett. ${form.sector}`;
+      
+      if (form.sectors.length > 0) {
+        const totalSectors = gh?.sectors.length || 12;
+        if (form.sectors.length === totalSectors) {
+          location += ' - Tutti i settori';
+        } else if (form.sectors.length <= 3) {
+          location += ` - Sett. ${form.sectors.join(', ')}`;
+        } else {
+          location += ` - ${form.sectors.length} settori`;
+        }
+      }
     }
     if (form.bench) {
       location += ` - ${form.bench}`;
@@ -242,7 +264,7 @@ export default function TreatmentEditScreen() {
               </ThemedText>
             </Pressable>
             <Pressable
-              onPress={() => setForm({ ...form, locationType: 'campo_aperto', greenhouse: null, sector: null, bench: null })}
+              onPress={() => setForm({ ...form, locationType: 'campo_aperto', greenhouse: null, sectors: [], bench: null })}
               style={[
                 styles.locationTypeButton,
                 { 
@@ -366,57 +388,104 @@ export default function TreatmentEditScreen() {
               </Pressable>
             </View>
             <RNScrollView style={styles.locationList}>
-              {config?.greenhouses.map((gh) => (
-                <View key={gh.id}>
-                  <Pressable
-                    onPress={() => {
-                      setForm({ ...form, greenhouse: gh.id, sector: null, bench: null });
-                    }}
-                    style={[
-                      styles.locationOption,
-                      { 
-                        backgroundColor: form.greenhouse === gh.id && !form.sector ? theme.primary + '20' : 'transparent',
-                        borderColor: form.greenhouse === gh.id ? theme.primary : theme.backgroundTertiary,
-                      }
-                    ]}
-                  >
-                    <Feather name="home" size={20} color={theme.primary} />
-                    <ThemedText style={styles.locationOptionText}>
-                      {gh.customName || `Serra ${gh.id}`}
-                    </ThemedText>
-                    {form.greenhouse === gh.id && !form.sector ? (
-                      <Feather name="check" size={20} color={theme.primary} />
-                    ) : null}
-                  </Pressable>
-                  
-                  {form.greenhouse === gh.id ? (
-                    <View style={styles.sectorList}>
-                      {gh.sectors.map((sect) => (
+              {config?.greenhouses.map((gh) => {
+                const allSectorIds = gh.sectors.map(s => s.id);
+                const allSelected = form.greenhouse === gh.id && 
+                  allSectorIds.every(id => form.sectors.includes(id));
+                
+                return (
+                  <View key={gh.id}>
+                    <Pressable
+                      onPress={() => {
+                        setForm({ ...form, greenhouse: gh.id, sectors: [], bench: null });
+                      }}
+                      style={[
+                        styles.locationOption,
+                        { 
+                          backgroundColor: form.greenhouse === gh.id ? theme.primary + '20' : 'transparent',
+                          borderColor: form.greenhouse === gh.id ? theme.primary : theme.backgroundTertiary,
+                        }
+                      ]}
+                    >
+                      <Feather name="home" size={20} color={theme.primary} />
+                      <ThemedText style={styles.locationOptionText}>
+                        {gh.customName || `Serra ${gh.id}`}
+                      </ThemedText>
+                      {form.greenhouse === gh.id ? (
+                        <Feather name="chevron-down" size={20} color={theme.primary} />
+                      ) : null}
+                    </Pressable>
+                    
+                    {form.greenhouse === gh.id ? (
+                      <View style={styles.sectorSection}>
                         <Pressable
-                          key={sect.id}
                           onPress={() => {
-                            setForm({ ...form, sector: sect.id, bench: null });
-                            setShowLocationPicker(false);
+                            if (allSelected) {
+                              setForm({ ...form, sectors: [] });
+                            } else {
+                              setForm({ ...form, sectors: allSectorIds });
+                            }
                           }}
                           style={[
-                            styles.sectorOption,
+                            styles.selectAllButton,
                             { 
-                              backgroundColor: form.sector === sect.id ? theme.primary + '20' : theme.backgroundSecondary,
+                              backgroundColor: allSelected ? theme.primary : theme.backgroundSecondary,
+                              borderColor: theme.primary,
                             }
                           ]}
                         >
-                          <ThemedText style={styles.sectorText}>
-                            {sect.customName || `Settore ${sect.id}`}
+                          <Feather 
+                            name={allSelected ? "check-square" : "square"} 
+                            size={18} 
+                            color={allSelected ? '#FFF' : theme.primary} 
+                          />
+                          <ThemedText style={{ color: allSelected ? '#FFF' : theme.primary, fontWeight: '600' }}>
+                            Seleziona Tutti
                           </ThemedText>
-                          {form.sector === sect.id ? (
-                            <Feather name="check" size={16} color={theme.primary} />
-                          ) : null}
                         </Pressable>
-                      ))}
-                    </View>
-                  ) : null}
-                </View>
-              ))}
+                        
+                        <View style={styles.sectorList}>
+                          {gh.sectors.map((sect) => {
+                            const isSelected = form.sectors.includes(sect.id);
+                            return (
+                              <Pressable
+                                key={sect.id}
+                                onPress={() => {
+                                  if (isSelected) {
+                                    setForm({ ...form, sectors: form.sectors.filter(s => s !== sect.id) });
+                                  } else {
+                                    setForm({ ...form, sectors: [...form.sectors, sect.id].sort((a, b) => a - b) });
+                                  }
+                                }}
+                                style={[
+                                  styles.sectorOption,
+                                  { 
+                                    backgroundColor: isSelected ? theme.primary : theme.backgroundSecondary,
+                                  }
+                                ]}
+                              >
+                                <ThemedText style={[styles.sectorText, { color: isSelected ? '#FFF' : theme.text }]}>
+                                  {sect.customName || `${sect.id}`}
+                                </ThemedText>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                        
+                        <Pressable
+                          onPress={() => setShowLocationPicker(false)}
+                          style={[styles.confirmButton, { backgroundColor: theme.primary }]}
+                        >
+                          <Feather name="check" size={18} color="#FFF" />
+                          <ThemedText style={{ color: '#FFF', fontWeight: '600' }}>
+                            Conferma ({form.sectors.length > 0 ? `${form.sectors.length} settori` : 'Tutta la serra'})
+                          </ThemedText>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
             </RNScrollView>
           </View>
         </Pressable>
@@ -558,9 +627,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  sectorList: {
-    marginLeft: Spacing.xl,
+  sectorSection: {
+    marginLeft: Spacing.lg,
     marginBottom: Spacing.md,
+    paddingTop: Spacing.sm,
+  },
+  selectAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+  },
+  sectorList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.xs,
@@ -572,8 +655,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.sm,
     gap: Spacing.xs,
+    minWidth: 48,
+    justifyContent: 'center',
   },
   sectorText: {
     fontSize: 14,
+    fontWeight: '500',
+  },
+  confirmButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
   },
 });
