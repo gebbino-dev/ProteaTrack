@@ -12,7 +12,6 @@ export type NotebookStackParamList = {
     treatmentId?: string;
     greenhouse?: number;
     sector?: number;
-    bench?: string;
   } | undefined;
 };
 

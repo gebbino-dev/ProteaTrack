@@ -20,7 +20,7 @@ export default function TreatmentEditScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const { theme } = useTheme();
-  const { treatmentId, greenhouse: presetGreenhouse, sector: presetSector, bench: presetBench } = route.params || {};
+  const { treatmentId, greenhouse: presetGreenhouse, sector: presetSector } = route.params || {};
   
   const [loading, setLoading] = useState(!!treatmentId);
   const [saving, setSaving] = useState(false);
@@ -33,7 +33,6 @@ export default function TreatmentEditScreen() {
     locationType: 'serra' as LocationType,
     greenhouse: null as number | null,
     sectors: [] as number[],
-    bench: null as string | null,
     customLocation: '',
     productId: '',
     productName: '',
@@ -67,7 +66,6 @@ export default function TreatmentEditScreen() {
             locationType: tx.locationType,
             greenhouse: tx.greenhouse,
             sectors: tx.sector ? [tx.sector] : [],
-            bench: tx.bench,
             customLocation: tx.customLocation,
             productId: tx.productId,
             productName: tx.productName,
@@ -86,7 +84,6 @@ export default function TreatmentEditScreen() {
           ...prev,
           greenhouse: presetGreenhouse ?? null,
           sectors: presetSector !== undefined ? [presetSector] : [],
-          bench: presetBench ?? null,
         }));
       }
     } catch (error) {
@@ -120,7 +117,7 @@ export default function TreatmentEditScreen() {
       const baseData = {
         locationType: form.locationType,
         greenhouse: form.greenhouse,
-        bench: form.bench,
+        bench: null as string | null,
         customLocation: form.customLocation.trim(),
         productId: form.productId,
         productName: form.productName.trim(),
@@ -152,7 +149,7 @@ export default function TreatmentEditScreen() {
               type: 'trattamento',
               greenhouse: form.greenhouse,
               sector,
-              bench: form.bench,
+              bench: null,
               locationType: form.locationType,
               customLocation: form.customLocation,
               date: form.date,
@@ -193,9 +190,6 @@ export default function TreatmentEditScreen() {
           location += ` - ${form.sectors.length} settori`;
         }
       }
-    }
-    if (form.bench) {
-      location += ` - ${form.bench}`;
     }
     return location;
   };
@@ -264,7 +258,7 @@ export default function TreatmentEditScreen() {
               </ThemedText>
             </Pressable>
             <Pressable
-              onPress={() => setForm({ ...form, locationType: 'campo_aperto', greenhouse: null, sectors: [], bench: null })}
+              onPress={() => setForm({ ...form, locationType: 'campo_aperto', greenhouse: null, sectors: [] })}
               style={[
                 styles.locationTypeButton,
                 { 
@@ -397,7 +391,7 @@ export default function TreatmentEditScreen() {
                   <View key={gh.id}>
                     <Pressable
                       onPress={() => {
-                        setForm({ ...form, greenhouse: gh.id, sectors: [], bench: null });
+                        setForm({ ...form, greenhouse: gh.id, sectors: [] });
                       }}
                       style={[
                         styles.locationOption,
