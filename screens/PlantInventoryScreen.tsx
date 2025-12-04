@@ -37,6 +37,7 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPlant, setEditingPlant] = useState<PlantRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteConfirmPlant, setDeleteConfirmPlant] = useState<PlantRecord | null>(null);
   
   const [formData, setFormData] = useState({
     variety: "",
@@ -116,31 +117,28 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
     }
   };
 
-  const handleDeletePlant = async (plant: PlantRecord) => {
+  const handleDeletePlant = (plant: PlantRecord) => {
     console.log("DELETE: Richiesta eliminazione per:", plant.id, plant.variety);
-    
-    Alert.alert(
-      "Elimina Pianta",
-      `Vuoi eliminare "${plant.variety}"?`,
-      [
-        { text: "Annulla", style: "cancel" },
-        {
-          text: "Elimina",
-          style: "destructive",
-          onPress: async () => {
-            console.log("DELETE: Confermato, elimino...");
-            try {
-              await storage.deletePlantRecord(plant.id);
-              console.log("DELETE: Eliminato con successo");
-              await loadInventory();
-            } catch (error) {
-              console.error("DELETE: Errore:", error);
-              Alert.alert("Errore", "Impossibile eliminare");
-            }
-          },
-        },
-      ]
-    );
+    setDeleteConfirmPlant(plant);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmPlant) return;
+    console.log("DELETE: Confermato, elimino...", deleteConfirmPlant.id);
+    try {
+      await storage.deletePlantRecord(deleteConfirmPlant.id);
+      console.log("DELETE: Eliminato con successo");
+      setDeleteConfirmPlant(null);
+      await loadInventory();
+    } catch (error) {
+      console.error("DELETE: Errore:", error);
+      setDeleteConfirmPlant(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    console.log("DELETE: Annullato");
+    setDeleteConfirmPlant(null);
   };
 
   const handleEditPlant = (plant: PlantRecord) => {
@@ -427,6 +425,43 @@ export default function PlantInventoryScreen({ navigation }: PlantInventoryScree
           </RNScrollView>
         </View>
       </Modal>
+
+      <Modal
+        visible={deleteConfirmPlant !== null}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={cancelDelete}
+      >
+        <View style={styles.deleteModalOverlay}>
+          <View style={[styles.deleteModalContent, { backgroundColor: theme.backgroundRoot }]}>
+            <Feather name="alert-triangle" size={48} color="#FF3B30" style={styles.deleteIcon} />
+            <ThemedText type="h4" style={styles.deleteTitle}>Elimina Pianta</ThemedText>
+            <ThemedText style={[styles.deleteMessage, { color: theme.textSecondary }]}>
+              Vuoi eliminare "{deleteConfirmPlant?.variety}"?
+            </ThemedText>
+            <View style={styles.deleteActions}>
+              <Pressable
+                onPress={cancelDelete}
+                style={({ pressed }) => [
+                  styles.deleteButton,
+                  { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <ThemedText>Annulla</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={confirmDelete}
+                style={({ pressed }) => [
+                  styles.deleteButton,
+                  { backgroundColor: "#FF3B30", opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <ThemedText style={styles.buttonTextWhite}>Elimina</ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -577,6 +612,42 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xl,
   },
   modalButton: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+  },
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  deleteModalContent: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
+    alignItems: "center",
+  },
+  deleteIcon: {
+    marginBottom: Spacing.md,
+  },
+  deleteTitle: {
+    marginBottom: Spacing.sm,
+    textAlign: "center",
+  },
+  deleteMessage: {
+    textAlign: "center",
+    marginBottom: Spacing.xl,
+  },
+  deleteActions: {
+    flexDirection: "row",
+    gap: Spacing.md,
+    width: "100%",
+  },
+  deleteButton: {
     flex: 1,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
