@@ -48,37 +48,131 @@ export default function DocumentScanScreen({ navigation }: DocumentScanScreenPro
 
   const generateId = () => Math.random().toString(36).substring(2, 15);
 
+  const STOP_WORDS = [
+    "totale", "subtotale", "iva", "imponibile", "codice", "art", "articolo",
+    "data", "fattura", "documento", "pagina", "pag", "cliente", "fornitore",
+    "indirizzo", "tel", "telefono", "email", "p.iva", "c.f.", "partita",
+    "spedizione", "trasporto", "ordine", "rif", "riferimento", "nr", "numero",
+    "euro", "prezzo", "importo", "sconto", "netto", "lordo", "quantità", "qty",
+    "descrizione", "prodotto", "unità", "misura", "colli", "peso", "note"
+  ];
+
+  const isStopLine = (line: string): boolean => {
+    const lowerLine = line.toLowerCase().trim();
+    if (lowerLine.length < 3) return true;
+    if (/^[\d\s.,€$%]+$/.test(lowerLine)) return true;
+    for (const word of STOP_WORDS) {
+      if (lowerLine.startsWith(word) || lowerLine.includes(word + ":")) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const parseTextToPlants = (text: string): ScannedPlant[] => {
     const plants: ScannedPlant[] = [];
-    const lines = text.split(/[\n\r]+/).filter(line => line.trim());
+    const lines = text
+      .split(/[\n\r]+/)
+      .map(line => line.replace(/\s+/g, " ").trim())
+      .filter(line => line.length > 0);
+
+    const lineData: Array<{ line: string; numbers: Array<{ value: number; position: number }> }> = [];
 
     for (const line of lines) {
-      const quantityMatch = line.match(/(\d+)\s*(pz|pezzi|unità|vasi|piante)?/i);
-      const quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
+      if (isStopLine(line)) continue;
 
-      let variety = line
-        .replace(/(\d+)\s*(pz|pezzi|unità|vasi|piante)?/gi, "")
-        .replace(/[-–—:,;]/g, " ")
-        .trim();
+      const numbers: Array<{ value: number; position: number }> = [];
+      const numberMatches = line.matchAll(/\b(\d{1,5})\b/g);
+      for (const match of numberMatches) {
+        const val = parseInt(match[1]);
+        if (val > 0 && val < 100000) {
+          numbers.push({ value: val, position: match.index || 0 });
+        }
+      }
+      lineData.push({ line, numbers });
+    }
 
-      if (variety.length < 3) continue;
+    const qtyPositions: number[] = [];
+    for (const { line, numbers } of lineData) {
+      if (numbers.length > 0) {
+        const rightmost = numbers[numbers.length - 1];
+        const relativePos = rightmost.position / Math.max(line.length, 1);
+        if (relativePos > 0.3) {
+          qtyPositions.push(rightmost.position);
+        }
+      }
+    }
 
-      let species = "Proteaceae";
-      const matchedVariety = PROTEACEAE_VARIETIES.find(v => 
-        line.toLowerCase().includes(v.toLowerCase().split(" ")[0])
-      );
-      if (matchedVariety) {
-        const genus = matchedVariety.split(" ")[0];
-        species = genus;
+    let qtyColumnPos = -1;
+    if (qtyPositions.length >= 2) {
+      qtyPositions.sort((a, b) => a - b);
+      qtyColumnPos = qtyPositions[Math.floor(qtyPositions.length / 2)];
+    }
+
+    let pendingName = "";
+
+    for (const { line, numbers } of lineData) {
+      let quantity = 0;
+      let name = line;
+
+      if (numbers.length > 0) {
+        const rightmost = numbers[numbers.length - 1];
+        
+        const isInQtyColumn = qtyColumnPos === -1 || 
+          Math.abs(rightmost.position - qtyColumnPos) < 15;
+        
+        if (isInQtyColumn || rightmost.position > line.length * 0.4) {
+          quantity = rightmost.value;
+          name = line.substring(0, rightmost.position).trim();
+        }
       }
 
-      plants.push({
-        id: generateId(),
-        variety: variety.substring(0, 50),
-        species,
-        quantity,
-        selected: true,
-      });
+      name = name
+        .replace(/^\d+[\s.:)-]*/g, "")
+        .replace(/\b\d{1,5}\s*(pz|pezzi|unità|vasi|piante|n\.|nr\.?)?\b/gi, "")
+        .replace(/[-–—:,;.]+$/g, "")
+        .replace(/^[-–—:,;.]+/g, "")
+        .trim();
+
+      if (quantity > 0 && name.length >= 3) {
+        const fullName = pendingName ? `${pendingName} ${name}` : name;
+        pendingName = "";
+
+        let species = "Proteaceae";
+        const matchedVariety = PROTEACEAE_VARIETIES.find(v => 
+          fullName.toLowerCase().includes(v.toLowerCase().split(" ")[0])
+        );
+        if (matchedVariety) {
+          species = matchedVariety.split(" ")[0];
+        }
+
+        plants.push({
+          id: generateId(),
+          variety: fullName.substring(0, 60),
+          species,
+          quantity: Math.min(quantity, 99999),
+          selected: true,
+        });
+      } else if (quantity === 0 && name.length >= 3 && !/^\d+$/.test(name)) {
+        pendingName = pendingName ? `${pendingName} ${name}` : name;
+      } else if (quantity > 0 && pendingName.length >= 3) {
+        let species = "Proteaceae";
+        const matchedVariety = PROTEACEAE_VARIETIES.find(v => 
+          pendingName.toLowerCase().includes(v.toLowerCase().split(" ")[0])
+        );
+        if (matchedVariety) {
+          species = matchedVariety.split(" ")[0];
+        }
+
+        plants.push({
+          id: generateId(),
+          variety: pendingName.substring(0, 60),
+          species,
+          quantity: Math.min(quantity, 99999),
+          selected: true,
+        });
+        pendingName = "";
+      }
     }
 
     return plants;
