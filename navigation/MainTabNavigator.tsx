@@ -5,18 +5,19 @@ import { BlurView } from "expo-blur";
 import { Platform, StyleSheet } from "react-native";
 import DashboardStackNavigator from "@/navigation/DashboardStackNavigator";
 import GreenhouseStackNavigator from "@/navigation/GreenhouseStackNavigator";
-import CalendarStackNavigator from "@/navigation/CalendarStackNavigator";
-import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
-import AccountingStackNavigator from "@/navigation/AccountingStackNavigator";
+import LavoroStackNavigator from "@/navigation/LavoroStackNavigator";
 import NotebookStackNavigator from "@/navigation/NotebookStackNavigator";
+import AccountingStackNavigator from "@/navigation/AccountingStackNavigator";
+import ReportStackNavigator from "@/navigation/ReportStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
 
 export type MainTabParamList = {
   DashboardTab: undefined;
-  GreenhouseTab: undefined;
-  AccountingTab: undefined;
-  NotebookTab: undefined;
-  ProfileTab: undefined;
+  ColtureTab: undefined;
+  LavoroTab: undefined;
+  QuadernoTab: undefined;
+  ContabilitaTab: undefined;
+  ReportTab: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -48,40 +49,43 @@ export default function MainTabNavigator() {
             />
           ) : null,
         headerShown: false,
+        tabBarLabelStyle: {
+          fontSize: 10,
+        },
       }}
     >
       <Tab.Screen
         name="DashboardTab"
         component={DashboardStackNavigator}
         options={{
-          title: "Dashboard",
+          title: "Home",
           tabBarIcon: ({ color, size }) => (
             <Feather name="home" size={size} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="GreenhouseTab"
+        name="ColtureTab"
         component={GreenhouseStackNavigator}
         options={{
-          title: "Serre",
+          title: "Colture",
           tabBarIcon: ({ color, size }) => (
             <Feather name="grid" size={size} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="AccountingTab"
-        component={AccountingStackNavigator}
+        name="LavoroTab"
+        component={LavoroStackNavigator}
         options={{
-          title: "Gestione",
+          title: "Lavoro",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="dollar-sign" size={size} color={color} />
+            <Feather name="clipboard" size={size} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="NotebookTab"
+        name="QuadernoTab"
         component={NotebookStackNavigator}
         options={{
           title: "Quaderno",
@@ -91,12 +95,22 @@ export default function MainTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="ProfileTab"
-        component={ProfileStackNavigator}
+        name="ContabilitaTab"
+        component={AccountingStackNavigator}
         options={{
-          title: "Profilo",
+          title: "Contabilita",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="user" size={size} color={color} />
+            <Feather name="dollar-sign" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="ReportTab"
+        component={ReportStackNavigator}
+        options={{
+          title: "Report",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="bar-chart-2" size={size} color={color} />
           ),
         }}
       />
