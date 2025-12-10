@@ -1,52 +1,60 @@
-# SerraManager - Gestione Serre Proteaceae
+# ProteaTrack - Gestione Serre Proteaceae
 
 ## Panoramica
-SerraManager è un'app mobile per la gestione di serre dedicate alla coltivazione di piante Proteaceae in vaso. L'app permette di tracciare le attività quotidiane (innaffiatura, concimazione, potatura, trattamenti) associandole a specifici bancali e settori delle serre.
+ProteaTrack è un'app mobile per la gestione di serre dedicate alla coltivazione di piante Proteaceae in vaso. L'app permette di tracciare le attività quotidiane, i trattamenti fitosanitari, la contabilità e di generare report analitici.
 
-## Funzionalità Principali
+## Architettura a 6 Moduli
 
-### Dashboard
+L'app è organizzata in 6 moduli principali accessibili tramite bottom tab navigation:
+
+### 1. Dashboard (Home)
 - Statistiche rapide: totale piante, attività odierne, bancali attivi
 - Lista delle attività recenti
-- FAB (Floating Action Button) per registrazione rapida attività
+- FAB per registrazione rapida attività
 
-### Gestione Serre
+### 2. Colture (Gestione Serre e Piante)
 - Visualizzazione delle 3 serre con conteggio piante e settori
 - Navigazione: Serra → Settori per Arcata → Dettaglio Bancale
-- Ogni bancale mostra: numero piante, varietà, data impianto, note, storico attività
+- Ogni bancale mostra: numero piante, varietà, data impianto, note
+- Inventario piante con scansione DDT (OCR solo web)
+- Usa tipi: `Greenhouse`, `Sector`, `Bench`, `PlantRecord`, `GreenhouseConfig`
 
-### Gestione Contabile (Gestionale)
-- **Dashboard Finanziaria**: riepilogo entrate/uscite con grafico mensile
-- **Registrazione Movimenti**: entrate e uscite con categoria, importo, data, note
-- **Categorie Predefinite**: 
-  - Costi: Acquisto Piante, Materiali, Manodopera, Fitofarmaci, Energia
-  - Ricavi: Vendita Piante, Servizi
-- **Esportazione CSV**: export dei movimenti per mese o anno completo
-- **Filtri**: per tipo (entrate/uscite) e per mese
+### 3. Lavoro (Attività Giornaliere)
+- Registrazione attività: innaffiatura, concimazione, potatura, trattamento, altro
+- Lista attività con filtri per tipo
+- Storico completo con dettagli
+- Usa tipo: `Activity`
 
-### Quaderno di Campagna
-- **Registro Trattamenti**: data, prodotto, dose, coltura, settore/bancale
-- **Storico Completo**: lista ordinata per data con filtri
-- **Esportazione CSV**: export per compliance normativa
-- **Integrazione**: collegamento con attività serra esistenti
+### 4. Quaderno (Quaderno di Campagna)
+- Registro trattamenti fitosanitari per compliance normativa
+- Data, prodotto, dose (g/hl), acqua (L), ubicazione, avversità
+- Selezione multipla settori con "Seleziona Tutti"
+- Esportazione CSV per documentazione
+- Usa tipi: `PhytosanitaryProduct`, `Treatment`
 
-### Inventario Piante
-- **Scansione DDT**: OCR per acquisizione automatica da documenti (solo web)
-- **Inserimento Manuale**: varietà, quantità, data arrivo
-- **Esportazione**: export inventario in CSV
+### 5. Contabilità (Gestionale Contabile)
+- Dashboard finanziaria: riepilogo entrate/uscite
+- Registrazione movimenti con categorie predefinite
+- Categorie costi: Materiali, Manodopera, Fitofarmaci, Fertilizzanti, etc.
+- Categorie ricavi: Vendita Piante, Vendita Fiori, Servizi, Contributi
+- Esportazione CSV per periodo
+- Usa tipi: `TransactionCategory`, `Transaction`, `FinancialSummary`
 
-### Profilo/Impostazioni
-- Informazioni azienda (nome responsabile, nome azienda, località)
-- Statistiche generali
-- Gestione dati (cancellazione dati)
+### 6. Report (Analisi e Statistiche)
+- Selezione periodo (anno/mese)
+- Riepilogo finanziario con margine
+- Statistiche serre (piante, settori attivi)
+- Breakdown attività per tipo
+- Breakdown trattamenti per prodotto
+- Usa tipi: `FinancialSummary`, `GreenhouseStats`
 
 ## Struttura delle Serre
-L'app gestisce 3 serre da 2000 m² ciascuna, organizzate come segue:
-- **Serra 1**: Settori 1-12 (3 Arcate x 4 Settori)
-- **Serra 2**: Settori 13-24 (3 Arcate x 4 Settori)
-- **Serra 3**: Settori 25-36 (3 Arcate x 4 Settori)
+L'app gestisce 3 serre da 2000 m² ciascuna:
+- **Serra 1 nord**: Settori 1-12 (3 Arcate x 4 Settori)
+- **Serra 2 nord**: Settori 13-24 (3 Arcate x 4 Settori) - include vivaio
+- **Serra 3 nord**: Settori 25-36 (3 Arcate x 4 Settori)
 
-Ogni settore contiene 5 bancali numerati: B1, B2, B3, B4, B5
+Ogni settore contiene 5 bancali: B1, B2, B3, B4, B5
 
 ## Architettura Tecnica
 
@@ -60,75 +68,94 @@ Ogni settore contiene 5 bancali numerati: B1, B2, B3, B4, B5
 ### Struttura File
 ```
 /screens
-  - DashboardScreen.tsx           # Schermata principale
+  # Dashboard
+  - DashboardScreen.tsx           # Schermata principale con statistiche
+
+  # Colture
   - GreenhouseListScreen.tsx      # Lista serre
   - SectorListScreen.tsx          # Settori per arcata
   - BenchDetailScreen.tsx         # Dettaglio bancale
-  - RecordActivityScreen.tsx      # Form registrazione attività
   - EditBenchScreen.tsx           # Modifica dati bancale
-  - ProfileScreen.tsx             # Impostazioni
-  - ActivityDetailScreen.tsx      # Dettaglio attività
   - PlantInventoryScreen.tsx      # Inventario piante
   - DocumentScanScreen.tsx        # Scansione DDT con OCR
-  - FinancialDashboardScreen.tsx  # Dashboard contabile
-  - TransactionListScreen.tsx     # Lista movimenti
-  - TransactionEditScreen.tsx     # Aggiungi/modifica movimento
+  - ConfigureGreenhouseScreen.tsx # Configurazione serre
+
+  # Lavoro
+  - LavoroScreen.tsx              # Lista attività con filtri
+  - RecordActivityScreen.tsx      # Form registrazione attività
+  - ActivityDetailScreen.tsx      # Dettaglio attività
+  - EditActivityScreen.tsx        # Modifica attività
+
+  # Quaderno
   - TreatmentListScreen.tsx       # Lista trattamenti
-  - TreatmentEditScreen.tsx       # Aggiungi/modifica trattamento
+  - TreatmentEditScreen.tsx       # Form registrazione trattamento
+
+  # Contabilità
+  - FinancialDashboardScreen.tsx  # Dashboard finanziaria
+  - TransactionListScreen.tsx     # Lista movimenti
+  - TransactionEditScreen.tsx     # Form registrazione movimento
+
+  # Report
+  - ReportScreen.tsx              # Analisi per periodo
+
+  # Altro
+  - ProfileScreen.tsx             # Impostazioni azienda
+  - CalendarScreen.tsx            # Vista calendario
 
 /navigation
-  - MainTabNavigator.tsx          # Tab bar principale (5 tab)
+  - MainTabNavigator.tsx          # Tab bar principale (6 tab)
   - DashboardStackNavigator.tsx   # Stack dashboard
-  - GreenhouseStackNavigator.tsx  # Stack serre
-  - AccountingStackNavigator.tsx  # Stack gestionale contabile
-  - NotebookStackNavigator.tsx    # Stack quaderno campagna
+  - GreenhouseStackNavigator.tsx  # Stack colture
+  - LavoroStackNavigator.tsx      # Stack lavoro
+  - NotebookStackNavigator.tsx    # Stack quaderno
+  - AccountingStackNavigator.tsx  # Stack contabilità
+  - ReportStackNavigator.tsx      # Stack report
   - ProfileStackNavigator.tsx     # Stack profilo
 
 /components
   - StatCard.tsx      # Card statistiche
   - ActivityCard.tsx  # Card attività
   - Button.tsx        # Pulsante animato
-  - Card.tsx          # Card con elevazione (supporta children)
+  - Card.tsx          # Card con elevazione
   - HeaderTitle.tsx   # Titolo header con logo
 
 /utils
   - storage.ts        # Funzioni AsyncStorage (CRUD per tutti i tipi)
 
 /types
-  - index.ts          # Tipi TypeScript
+  - index.ts          # FONTE UNICA per tipi e costanti (NON MODIFICARE)
 ```
 
-### Tipi Dati Principali
+### Tipi Dati (da types/index.ts - NON MODIFICARE)
 ```typescript
-Activity {
-  id, type, greenhouse, sector, bench, date, notes, createdAt
-}
+// Attività
+Activity { id, type, greenhouse, sector, bench, locationType, customLocation, date, notes, createdAt }
+ActivityType = 'innaffiatura' | 'concimazione' | 'potatura' | 'trattamento' | 'altro'
 
-Bench {
-  id, greenhouse, sector, benchNumber, plantCount, variety, plantingDate, notes
-}
+// Colture
+Bench { id, greenhouse, sector, benchNumber, plantCount, variety, plantingDate, notes, placche }
+Greenhouse { id, customName, sectors, benchCount, benchNames }
+Sector { id, customName }
+GreenhouseConfig { greenhouses, hasOpenField }
+PlantRecord { id, variety, species, quantity, arrivalDate, sourceDocument, notes }
 
-Transaction {
-  id, type ('income'|'expense'), categoryId, amount, date, description, notes, 
-  source, docRef, createdAt
-}
+// Contabilità
+Transaction { id, type, categoryId, amount, date, counterparty, description, docRef, docType, vatRate, notes, source, createdAt }
+TransactionCategory { id, name, type, icon, color }
+TransactionType = 'ricavo' | 'costo'
+FinancialSummary { period, income, expenses, margin, byCategory }
 
-Category {
-  id, name, type ('income'|'expense'), isDefault
-}
+// Quaderno di Campagna
+Treatment { id, greenhouse, sector, bench, locationType, customLocation, productId, productName, dosePerHl, waterLiters, areaM2, targetPest, date, weatherConditions, notes, linkedActivityId, externalId, createdAt }
+PhytosanitaryProduct { id, name, activeIngredient, formulation, registrationNumber, phiDays, fracCode, notes }
+LocationType = 'serra' | 'campo_aperto'
 
-Treatment {
-  id, date, productName, dose, unit, crop, greenhouse, sector, bench,
-  notes, weatherConditions, operator, externalId, createdAt
-}
+// Report
+GreenhouseStats { totalPlants, activeSectors, todayActivities }
 
-PlantRecord {
-  id, variety, species, quantity, arrivalDate, notes, createdAt
-}
-
-UserSettings {
-  name, companyName, location
-}
+// Costanti disponibili in index.ts
+ACTIVITY_TYPES, PROTEACEAE_VARIETIES, DEFAULT_GREENHOUSE_CONFIG
+DEFAULT_EXPENSE_CATEGORIES, DEFAULT_REVENUE_CATEGORIES, DEFAULT_CATEGORIES
 ```
 
 ### Colori Attività
@@ -139,20 +166,11 @@ UserSettings {
 - Altro: Grigio (#607D8B)
 
 ### Colori Contabilità
-- Entrate: Verde (#4CAF50)
-- Uscite: Rosso (#F44336)
+- Ricavi: Verde (#4CAF50)
+- Costi: Rosso (#F44336)
 
 ## Varietà Proteaceae Supportate
-- Leucospermum cordifolium
-- Protea cynaroides
-- Leucadendron salignum
-- Banksia coccinea
-- Protea magnifica
-- Leucospermum reflexum
-- Protea repens
-- Leucadendron laureolum
-- Banksia prionotes
-- Protea neriifolia
+Leucospermum cordifolium, Protea cynaroides, Leucadendron salignum, Banksia coccinea, Protea magnifica, Leucospermum reflexum, Protea repens, Leucadendron laureolum, Banksia prionotes, Protea neriifolia
 
 ## Comandi Sviluppo
 ```bash
@@ -165,5 +183,6 @@ npm run dev    # Avvia server Expo
 - UI ad alto contrasto per uso in condizioni di luce intensa (serra)
 - Lingua interfaccia: Italiano
 - OCR (Tesseract.js) funziona solo su piattaforma web
-- Expo FileSystem usa nuova API: `Paths`, `File as ExpoFile` per export CSV
-- Card component supporta prop `children` per contenuto flessibile
+- Trattamenti: creazione atomica (1 record per settore) per compliance
+- Selezione multipla settori con pulsante "Seleziona Tutti"
+- **IMPORTANTE**: types/index.ts è la fonte unica per tipi e costanti - mai modificare o ridefinire altrove

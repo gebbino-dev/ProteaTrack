@@ -30,7 +30,7 @@ export default function DashboardStackNavigator() {
         name="Dashboard"
         component={DashboardScreen}
         options={{
-          headerTitle: () => <HeaderTitle title="SerraManager" />,
+          headerTitle: () => <HeaderTitle title="ProteaTrack" />,
         }}
       />
       <Stack.Screen

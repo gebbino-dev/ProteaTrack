@@ -11,11 +11,11 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { storage } from "@/utils/storage";
 import { Activity, ACTIVITY_TYPES } from "@/types";
-import { CalendarStackParamList } from "@/navigation/CalendarStackNavigator";
+import { LavoroStackParamList } from "@/navigation/LavoroStackNavigator";
 
 type EditActivityScreenProps = {
-  navigation: NativeStackNavigationProp<CalendarStackParamList, "EditActivity">;
-  route: RouteProp<CalendarStackParamList, "EditActivity">;
+  navigation: NativeStackNavigationProp<LavoroStackParamList, "EditActivity">;
+  route: RouteProp<LavoroStackParamList, "EditActivity">;
 };
 
 export default function EditActivityScreen({ navigation, route }: EditActivityScreenProps) {
@@ -161,8 +161,6 @@ export default function EditActivityScreen({ navigation, route }: EditActivitySc
     </ScreenKeyboardAwareScrollView>
   );
 }
-
-import { Pressable } from "react-native";
 
 const styles = StyleSheet.create({
   loadingContainer: {

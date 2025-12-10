@@ -12,11 +12,11 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { storage } from "@/utils/storage";
 import { Activity, ACTIVITY_TYPES } from "@/types";
-import { CalendarStackParamList } from "@/navigation/CalendarStackNavigator";
+import { LavoroStackParamList } from "@/navigation/LavoroStackNavigator";
 
 type ActivityDetailScreenProps = {
-  navigation: NativeStackNavigationProp<CalendarStackParamList, "ActivityDetail">;
-  route: RouteProp<CalendarStackParamList, "ActivityDetail">;
+  navigation: NativeStackNavigationProp<LavoroStackParamList, "ActivityDetail">;
+  route: RouteProp<LavoroStackParamList, "ActivityDetail">;
 };
 
 export default function ActivityDetailScreen({ navigation, route }: ActivityDetailScreenProps) {
