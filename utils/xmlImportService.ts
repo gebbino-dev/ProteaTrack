@@ -172,7 +172,48 @@ function parseParty(partyXml: string): InvoiceParty {
 
 const MY_VAT = "IT01747200473";
 
+const REVENUE_KEYWORDS = [
+  'conferimento fiori',
+  'acconto conferimento',
+  'vendita fiori',
+  'vendita piante',
+];
+
+function containsRevenueKeywords(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  
+  for (const keyword of REVENUE_KEYWORDS) {
+    if (lowerText.includes(keyword)) {
+      return true;
+    }
+  }
+  
+  if (lowerText.includes('conferimento') && lowerText.includes('fiori')) {
+    return true;
+  }
+  
+  return false;
+}
+
 function determineTransactionType(tipoDocumento: string, xml: string): TransactionType {
+  const fatturaBody = getTextContent(xml, 'FatturaElettronicaBody') || xml;
+  const datiGenerali = getTextContent(fatturaBody, 'DatiGenerali') || '';
+  const datiGeneraliDocumento = getTextContent(datiGenerali, 'DatiGeneraliDocumento') || '';
+  const datiBeniServizi = getTextContent(fatturaBody, 'DatiBeniServizi') || '';
+  
+  const causale = getTextContent(datiGeneraliDocumento, 'Causale') || '';
+  
+  const dettaglioLineeElements = getAllElements(datiBeniServizi, 'DettaglioLinee');
+  const lineDescriptions = dettaglioLineeElements
+    .map(lineXml => getTextContent(lineXml, 'Descrizione') || '')
+    .join(' ');
+  
+  const combinedText = `${causale} ${lineDescriptions}`;
+  
+  if (containsRevenueKeywords(combinedText)) {
+    return 'ricavo';
+  }
+  
   const cedenteXml = getTextContent(xml, 'CedentePrestatore') || '';
   const cessionarioXml = getTextContent(xml, 'CessionarioCommittente') || '';
   
