@@ -1,0 +1,43 @@
+
+Sto usando `xmlImportService.ts` per importare fatture elettroniche XML nella mia app ProteaTrack.  
+Adesso la funzione `determineTransactionType` restituisce sempre `"costo"`, quindi anche le fatture di **vendita / conferimento fiori** vengono trattate come costi.
+
+Voglio che il tipo di transazione sia deciso in base a **chi sono io nell’XML**:
+
+- se io sono il **Cessionario/Committente** → è una fattura di **acquisto** → `type = 'costo'`  
+- se io sono il **Cedente/Prestatore** (es. conferimento fiori emesso dalla cooperativa in nome e per conto mio) → è una fattura di **vendita** → `type = 'ricavo'`
+
+La mia P.IVA è: **IT01747200473** (puoi metterla per ora in una costante, poi la sposterò in configurazione).
+
+Per favore:
+
+1. In `xmlImportService.ts` modifica **solo** la funzione `determineTransactionType` in questo modo:
+
+   - leggi l’intero blocco `CedentePrestatore` e `CessionarioCommittente` dall’XML (puoi riusare `getTextContent` e `getNestedTextContent`).  
+   - estrai da ciascuno il valore `IdFiscaleIVA/IdCodice`.  
+   - confronta con la mia P.IVA `IT01747200473`:
+     - se `cessionarioVat === myVat` → ritorna `'costo'`  
+     - se `cedenteVat === myVat` → ritorna `'ricavo'`  
+   - se non riesci a determinare (mancano i dati), usa come fallback `'costo'`.
+
+   Pseudocodice di riferimento:
+
+   ```ts
+   const MY_VAT = "IT01747200473";
+
+   function determineTransactionType(tipoDocumento: string, xml: string): TransactionType {
+     const cedenteXml = getTextContent(xml, "CedentePrestatore") || "";
+     const cessionarioXml = getTextContent(xml, "CessionarioCommittente") || "";
+
+     const cedenteVat = getNestedTextContent(cedenteXml, "IdFiscaleIVA", "IdCodice");
+     const cessionarioVat = getNestedTextContent(cessionarioXml, "IdFiscaleIVA", "IdCodice");
+
+     if (cessionarioVat === MY_VAT) return "costo";   // io sono il cliente → acquisto
+     if (cedenteVat === MY_VAT) return "ricavo";      // io sono il fornitore → vendita / conferimento
+
+     // fallback, se non riconosci
+     return "costo";
+   }
+   ```
+
+2. Non cambiare nient’altro in `parseInvoiceXml` o in `extractInventoryItems`: voglio solo che, dopo questa modifica, le fatture in cui io risulto fornitore (es. “conferimento fiori”, “acconto conferimento fiori”) siano importate come `Transaction` con `type: 'ricavo'` e usino `DEFAULT_REVENUE_CATEGORIES` invece delle categorie di costo.

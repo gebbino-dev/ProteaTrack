@@ -170,14 +170,21 @@ function parseParty(partyXml: string): InvoiceParty {
   };
 }
 
+const MY_VAT = "IT01747200473";
+
 function determineTransactionType(tipoDocumento: string, xml: string): TransactionType {
-  const isCredit = ['TD04', 'TD05', 'TD08', 'TD09'].includes(tipoDocumento);
+  const cedenteXml = getTextContent(xml, 'CedentePrestatore') || '';
+  const cessionarioXml = getTextContent(xml, 'CessionarioCommittente') || '';
   
-  const cedente = getTextContent(xml, 'CedentePrestatore');
-  const cessionario = getTextContent(xml, 'CessionarioCommittente');
+  const cedenteVat = getNestedTextContent(cedenteXml, 'IdFiscaleIVA', 'IdCodice');
+  const cessionarioVat = getNestedTextContent(cessionarioXml, 'IdFiscaleIVA', 'IdCodice');
   
-  if (!cedente || !cessionario) {
-    return tipoDocumento.startsWith('TD01') || tipoDocumento.startsWith('TD02') ? 'costo' : 'costo';
+  if (cessionarioVat === MY_VAT) {
+    return 'costo';
+  }
+  
+  if (cedenteVat === MY_VAT) {
+    return 'ricavo';
   }
   
   return 'costo';
