@@ -121,9 +121,7 @@ export const inventoryStore = {
     }
 
     const existingProducts = await storage.getProducts();
-    const existingProduct = existingProducts.find(
-      p => p.name.toLowerCase() === item.description.toLowerCase()
-    );
+    const existingProduct = this.findMatchingProduct(item.description, existingProducts);
 
     if (existingProduct) {
       return existingProduct;
@@ -140,6 +138,43 @@ export const inventoryStore = {
     };
 
     return await storage.saveProduct(productData);
+  },
+
+  findMatchingProduct(description: string, products: PhytosanitaryProduct[]): PhytosanitaryProduct | null {
+    const descLower = description.toLowerCase().trim();
+    
+    const exactMatch = products.find(p => p.name.toLowerCase().trim() === descLower);
+    if (exactMatch) {
+      return exactMatch;
+    }
+    
+    for (const product of products) {
+      const productName = product.name.toLowerCase().trim();
+      if (productName.length >= 4 && descLower.includes(productName)) {
+        return product;
+      }
+      if (descLower.length >= 4 && productName.includes(descLower)) {
+        return product;
+      }
+    }
+    
+    const descWords = descLower.split(/\s+/).filter(w => w.length > 3);
+    if (descWords.length === 0) {
+      return null;
+    }
+    
+    for (const product of products) {
+      const productWords = product.name.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      if (productWords.length === 0) {
+        continue;
+      }
+      const matchCount = descWords.filter(w => productWords.includes(w)).length;
+      if (matchCount >= 1 && matchCount >= productWords.length * 0.6) {
+        return product;
+      }
+    }
+    
+    return null;
   },
 
   async checkDuplicateInvoice(parsedInvoice: ParsedInvoice): Promise<{ isDuplicate: boolean; existingId?: string }> {
