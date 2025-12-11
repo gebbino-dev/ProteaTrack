@@ -75,22 +75,30 @@ export default function TransactionListScreen() {
 
   const getCategoryById = (id: string) => categories.find(c => c.id === id);
 
-  const handleDelete = (id: string) => {
-    Alert.alert(
-      'Elimina Movimento',
-      'Sei sicuro di voler eliminare questo movimento?',
-      [
-        { text: 'Annulla', style: 'cancel' },
-        {
-          text: 'Elimina',
-          style: 'destructive',
-          onPress: async () => {
-            await storage.deleteTransaction(id);
-            loadData();
+  const handleDelete = async (id: string) => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Sei sicuro di voler eliminare questo movimento?');
+      if (confirmed) {
+        await storage.deleteTransaction(id);
+        loadData();
+      }
+    } else {
+      Alert.alert(
+        'Elimina Movimento',
+        'Sei sicuro di voler eliminare questo movimento?',
+        [
+          { text: 'Annulla', style: 'cancel' },
+          {
+            text: 'Elimina',
+            style: 'destructive',
+            onPress: async () => {
+              await storage.deleteTransaction(id);
+              loadData();
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleExport = async () => {

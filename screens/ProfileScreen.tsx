@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, StyleSheet, TextInput, Alert, Pressable } from "react-native";
+import { View, StyleSheet, TextInput, Alert, Pressable, Platform } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -10,6 +10,7 @@ import Spacer from "@/components/Spacer";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { storage } from "@/utils/storage";
+import { clearImportedData } from "@/utils/debugTools";
 import { UserSettings } from "@/types";
 import type { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 
@@ -61,28 +62,79 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     }
   };
 
-  const handleClearData = () => {
-    Alert.alert(
-      "Cancella Tutti i Dati",
-      "Questa azione cancellerà tutti i dati salvati nell'app. Sei sicuro?",
-      [
-        { text: "Annulla", style: "cancel" },
-        {
-          text: "Cancella",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await storage.clearAllData();
-              setSettings({ name: "", companyName: "", location: "" });
-              setStats({ totalPlants: 0, totalActivities: 0, benchesWithPlants: 0 });
-              Alert.alert("Completato", "Tutti i dati sono stati cancellati");
-            } catch (error) {
-              Alert.alert("Errore", "Impossibile cancellare i dati");
-            }
-          },
-        },
-      ]
-    );
+  const handleClearData = async () => {
+    const doClear = async () => {
+      try {
+        await storage.clearAllData();
+        setSettings({ name: "", companyName: "", location: "" });
+        setStats({ totalPlants: 0, totalActivities: 0, benchesWithPlants: 0 });
+        if (Platform.OS === 'web') {
+          window.alert("Tutti i dati sono stati cancellati");
+        } else {
+          Alert.alert("Completato", "Tutti i dati sono stati cancellati");
+        }
+      } catch (error) {
+        if (Platform.OS === 'web') {
+          window.alert("Errore: Impossibile cancellare i dati");
+        } else {
+          Alert.alert("Errore", "Impossibile cancellare i dati");
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm("Questa azione cancellerà tutti i dati salvati nell'app. Sei sicuro?");
+      if (confirmed) await doClear();
+    } else {
+      Alert.alert(
+        "Cancella Tutti i Dati",
+        "Questa azione cancellerà tutti i dati salvati nell'app. Sei sicuro?",
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: "Cancella", style: "destructive", onPress: doClear },
+        ]
+      );
+    }
+  };
+
+  const handleClearImportedData = async () => {
+    const doClear = async () => {
+      try {
+        const result = await clearImportedData();
+        const message = `Rimossi: ${result.transactionsDeleted} transazioni, ${result.plantsDeleted} piante, ${result.materialsDeleted} materiali, ${result.productsDeleted} prodotti`;
+        if (Platform.OS === 'web') {
+          window.alert(message);
+        } else {
+          Alert.alert("Pulizia Completata", message);
+        }
+        const statsData = await storage.getStats();
+        setStats({
+          totalPlants: statsData.totalPlants,
+          totalActivities: statsData.recentActivities.length,
+          benchesWithPlants: statsData.benchesWithPlants,
+        });
+      } catch (error) {
+        if (Platform.OS === 'web') {
+          window.alert("Errore durante la pulizia");
+        } else {
+          Alert.alert("Errore", "Impossibile pulire i dati importati");
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm("Rimuovere tutte le transazioni e materiali importati da fattura?");
+      if (confirmed) await doClear();
+    } else {
+      Alert.alert(
+        "Pulisci Dati Importati",
+        "Rimuovere tutte le transazioni e materiali importati da fattura?",
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: "Pulisci", style: "destructive", onPress: doClear },
+        ]
+      );
+    }
   };
 
   const inputStyle = [
@@ -270,6 +322,25 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       <ThemedText type="h4" style={styles.sectionTitle}>
         Gestione Dati
       </ThemedText>
+
+      <Spacer height={Spacing.lg} />
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.dangerButton,
+          {
+            backgroundColor: theme.backgroundDefault,
+            borderColor: theme.activityTreatment,
+            opacity: pressed ? 0.8 : 1,
+          },
+        ]}
+        onPress={handleClearImportedData}
+      >
+        <Feather name="refresh-cw" size={20} color={theme.activityTreatment} />
+        <ThemedText style={[styles.dangerButtonText, { color: theme.activityTreatment }]}>
+          Pulisci Dati Importati
+        </ThemedText>
+      </Pressable>
 
       <Spacer height={Spacing.lg} />
 
