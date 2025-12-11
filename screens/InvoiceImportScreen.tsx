@@ -33,6 +33,8 @@ const ITEM_TYPE_OPTIONS: { value: ItemTypeOption; label: string; icon: string }[
   { value: 'fitofarmaco', label: 'Fitofarmaco', icon: 'shield' },
   { value: 'fertilizzante', label: 'Fertilizzante', icon: 'droplet' },
   { value: 'materiale', label: 'Materiale', icon: 'tool' },
+  { value: 'semi', label: 'Semi', icon: 'circle' },
+  { value: 'utenza', label: 'Utenza', icon: 'zap' },
   { value: 'altro', label: 'Altro', icon: 'box' },
 ];
 

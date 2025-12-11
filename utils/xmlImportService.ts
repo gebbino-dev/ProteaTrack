@@ -45,7 +45,7 @@ export interface ParsedInvoice {
   causale?: string;
 }
 
-export type ItemTypeOption = 'piante' | 'vasi' | 'terriccio' | 'fitofarmaco' | 'fertilizzante' | 'materiale' | 'altro';
+export type ItemTypeOption = 'piante' | 'vasi' | 'terriccio' | 'fitofarmaco' | 'fertilizzante' | 'materiale' | 'semi' | 'utenza' | 'altro';
 
 export interface InventoryImportItem {
   type: 'plant' | 'material';
