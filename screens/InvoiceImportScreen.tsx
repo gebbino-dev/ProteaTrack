@@ -22,6 +22,7 @@ import {
   ItemTypeOption
 } from "@/utils/xmlImportService";
 import { inventoryStore } from "@/utils/inventoryStore";
+import { resetAllData, clearImportedData, getDataStats } from "@/utils/debugTools";
 import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_REVENUE_CATEGORIES } from "@/types";
 import { AccountingStackParamList } from "@/navigation/AccountingStackNavigator";
 
@@ -45,6 +46,64 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
   const [inventoryItems, setInventoryItems] = useState<InventoryImportItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+
+  const handleResetAllData = async () => {
+    Alert.alert(
+      "Conferma Reset",
+      "Vuoi eliminare TUTTI i dati (transazioni, piante, materiali, prodotti)? Questa azione non può essere annullata.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Elimina Tutto",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const result = await resetAllData();
+              Alert.alert(
+                "Dati Eliminati",
+                `Eliminati:\n- ${result.transactionsDeleted} transazioni\n- ${result.plantsDeleted} piante\n- ${result.materialsDeleted} materiali\n- ${result.productsDeleted} prodotti`
+              );
+            } catch (error) {
+              Alert.alert("Errore", "Impossibile eliminare i dati");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearImportedData = async () => {
+    Alert.alert(
+      "Conferma Pulizia",
+      "Vuoi eliminare solo i dati importati da fatture?",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Elimina Importati",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const result = await clearImportedData();
+              Alert.alert(
+                "Dati Importati Eliminati",
+                `Eliminati:\n- ${result.transactionsDeleted} transazioni\n- ${result.plantsDeleted} piante\n- ${result.materialsDeleted} materiali\n- ${result.productsDeleted} prodotti`
+              );
+            } catch (error) {
+              Alert.alert("Errore", "Impossibile eliminare i dati");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleShowStats = async () => {
+    const stats = await getDataStats();
+    Alert.alert(
+      "Statistiche Storage",
+      `Transazioni: ${stats.transactions} (${stats.importedTransactions} importate)\nPiante: ${stats.plants}\nMateriali: ${stats.materials}\nProdotti: ${stats.products}`
+    );
+  };
 
   const pickDocument = async () => {
     try {
@@ -224,6 +283,47 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
             {loading ? "Caricamento..." : "Seleziona File XML"}
           </ThemedText>
         </Pressable>
+
+        <Spacer height={Spacing.xl} />
+        
+        <Card style={{ borderColor: "#FF9800", borderWidth: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.sm }}>
+            <Feather name="alert-triangle" size={16} color="#FF9800" />
+            <ThemedText style={{ marginLeft: Spacing.sm, fontWeight: "600", color: "#FF9800" }}>
+              Debug (Sviluppo)
+            </ThemedText>
+          </View>
+          
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm }}>
+            <Pressable
+              style={[styles.debugButton, { backgroundColor: theme.backgroundSecondary }]}
+              onPress={handleShowStats}
+            >
+              <Feather name="bar-chart-2" size={14} color={theme.text} />
+              <ThemedText style={{ marginLeft: Spacing.xs, fontSize: 12 }}>Stats</ThemedText>
+            </Pressable>
+            
+            <Pressable
+              style={[styles.debugButton, { backgroundColor: "#FFF3E0" }]}
+              onPress={handleClearImportedData}
+            >
+              <Feather name="filter" size={14} color="#E65100" />
+              <ThemedText style={{ marginLeft: Spacing.xs, fontSize: 12, color: "#E65100" }}>
+                Solo Importati
+              </ThemedText>
+            </Pressable>
+            
+            <Pressable
+              style={[styles.debugButton, { backgroundColor: "#FFEBEE" }]}
+              onPress={handleResetAllData}
+            >
+              <Feather name="trash-2" size={14} color="#C62828" />
+              <ThemedText style={{ marginLeft: Spacing.xs, fontSize: 12, color: "#C62828" }}>
+                Reset Tutto
+              </ThemedText>
+            </Pressable>
+          </View>
+        </Card>
 
         {parsedInvoice ? (
           <>
@@ -619,5 +719,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
+  },
+  debugButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
   },
 });
