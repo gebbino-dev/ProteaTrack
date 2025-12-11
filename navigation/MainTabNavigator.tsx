@@ -78,9 +78,9 @@ export default function MainTabNavigator() {
         name="LavoroTab"
         component={LavoroStackNavigator}
         options={{
-          title: "Lavoro",
+          title: "Magazzino",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="clipboard" size={size} color={color} />
+            <Feather name="package" size={size} color={color} />
           ),
         }}
       />

@@ -1,6 +1,6 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import LavoroScreen from "@/screens/LavoroScreen";
+import MagazzinoScreen from "@/screens/MagazzinoScreen";
 import RecordActivityScreen from "@/screens/RecordActivityScreen";
 import ActivityDetailScreen from "@/screens/ActivityDetailScreen";
 import EditActivityScreen from "@/screens/EditActivityScreen";
@@ -32,9 +32,9 @@ export default function LavoroStackNavigator() {
     >
       <Stack.Screen
         name="Lavoro"
-        component={LavoroScreen}
+        component={MagazzinoScreen}
         options={{
-          headerTitle: () => <HeaderTitle title="Lavoro" showIcon={false} />,
+          headerTitle: () => <HeaderTitle title="Magazzino" showIcon={false} />,
         }}
       />
       <Stack.Screen

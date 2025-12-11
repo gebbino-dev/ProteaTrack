@@ -22,6 +22,7 @@ import {
   ItemTypeOption
 } from "@/utils/xmlImportService";
 import { inventoryStore } from "@/utils/inventoryStore";
+import { pendingInvoiceStore, ItemCategory } from "@/utils/pendingInvoiceStore";
 import { resetAllData, clearImportedData, getDataStats } from "@/utils/debugTools";
 import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_REVENUE_CATEGORIES } from "@/types";
 import { AccountingStackParamList } from "@/navigation/AccountingStackNavigator";
@@ -180,25 +181,40 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
         return;
       }
 
-      const result = await inventoryStore.processInvoiceImport(
-        parsedInvoice,
-        inventoryItems,
-        selectedCategory
-      );
+      const txResult = await inventoryStore.addTransaction(parsedInvoice, selectedCategory);
+
+      const supplierName = parsedInvoice.supplier?.denomination || 'Fornitore';
+      const pendingLines = inventoryItems
+        .filter(item => item.selected)
+        .map(item => ({
+          invoiceNumber: `FT ${parsedInvoice.documentNumber}`,
+          invoiceDate: parsedInvoice.documentDate,
+          supplierName,
+          lineNumber: item.lineNumber,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.quantity * item.unitPrice,
+          unitOfMeasure: item.unitOfMeasure,
+          vatRate: undefined,
+          detectedCategory: (item.itemType || 'altro') as ItemCategory,
+          assignedCategory: (item.itemType || 'altro') as ItemCategory,
+          isProcessed: false,
+        }));
+
+      if (pendingLines.length > 0) {
+        await pendingInvoiceStore.savePendingLines(pendingLines);
+      }
 
       const messageParts = [
-        `Fattura ${parsedInvoice.documentNumber} importata con successo.`,
+        `Fattura ${parsedInvoice.documentNumber} importata.`,
         `Importo: ${formatCurrency(parsedInvoice.totalAmount)}`,
-      ];
+        txResult.success ? "Movimento contabile registrato." : "",
+      ].filter(Boolean);
 
-      if (result.plantsAdded > 0) {
-        messageParts.push(`Piante registrate: ${result.plantsAdded} lotti`);
-      }
-      if (result.materialsAdded > 0) {
-        messageParts.push(`Materiali registrati: ${result.materialsAdded}`);
-      }
-      if (result.productsAdded > 0) {
-        messageParts.push(`Prodotti fitosanitari: ${result.productsAdded}`);
+      if (pendingLines.length > 0) {
+        messageParts.push(`\nRighe in attesa: ${pendingLines.length}`);
+        messageParts.push(`Vai in Magazzino per verificare e confermare le assegnazioni.`);
       }
 
       Alert.alert(

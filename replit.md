@@ -19,11 +19,13 @@ L'app è organizzata in 6 moduli principali accessibili tramite bottom tab navig
 - Inventario piante con scansione DDT (OCR solo web)
 - Usa tipi: `Greenhouse`, `Sector`, `Bench`, `PlantRecord`, `GreenhouseConfig`
 
-### 3. Lavoro (Attività Giornaliere)
-- Registrazione attività: innaffiatura, concimazione, potatura, trattamento, altro
-- Lista attività con filtri per tipo
-- Storico completo con dettagli
-- Usa tipo: `Activity`
+### 3. Magazzino (Gestione Materiali da Fatture)
+- Visualizzazione righe fattura importate con assegnazione automatica
+- Modifica manuale categoria per ogni riga (piante, vasi, terriccio, fitofarmaci, fertilizzanti, materiali, semi, utenze, altro)
+- Conferma/elimina righe singole
+- Filtro per categoria
+- Collegamento con import fatture XML dalla sezione Contabilità
+- Usa tipi: `PendingInvoiceLine`, `ItemCategory`
 
 ### 4. Quaderno (Quaderno di Campagna)
 - Registro trattamenti fitosanitari per compliance normativa
@@ -80,8 +82,9 @@ Ogni settore contiene 5 bancali: B1, B2, B3, B4, B5
   - DocumentScanScreen.tsx        # Scansione DDT con OCR
   - ConfigureGreenhouseScreen.tsx # Configurazione serre
 
-  # Lavoro
-  - LavoroScreen.tsx              # Lista attività con filtri
+  # Magazzino
+  - MagazzinoScreen.tsx           # Gestione righe fattura importate
+  - LavoroScreen.tsx              # (obsoleto) Lista attività con filtri
   - RecordActivityScreen.tsx      # Form registrazione attività
   - ActivityDetailScreen.tsx      # Dettaglio attività
   - EditActivityScreen.tsx        # Modifica attività
@@ -120,7 +123,11 @@ Ogni settore contiene 5 bancali: B1, B2, B3, B4, B5
   - HeaderTitle.tsx   # Titolo header con logo
 
 /utils
-  - storage.ts        # Funzioni AsyncStorage (CRUD per tutti i tipi)
+  - storage.ts              # Funzioni AsyncStorage (CRUD per tutti i tipi)
+  - pendingInvoiceStore.ts  # Storage righe fattura in attesa di assegnazione
+  - plantWarehouse.ts       # Gestione magazzino piante e distribuzioni
+  - xmlImportService.ts     # Parser fatture XML FatturaPA
+  - inventoryStore.ts       # Gestione inventario materiali
 
 /types
   - index.ts          # FONTE UNICA per tipi e costanti (NON MODIFICARE)
@@ -186,3 +193,5 @@ npm run dev    # Avvia server Expo
 - Trattamenti: creazione atomica (1 record per settore) per compliance
 - Selezione multipla settori con pulsante "Seleziona Tutti"
 - **IMPORTANTE**: types/index.ts è la fonte unica per tipi e costanti - mai modificare o ridefinire altrove
+- Righe fattura importate vanno in Magazzino per revisione manuale prima di essere processate
+- Categorie materiali: piante, vasi, terriccio, fitofarmaco, fertilizzante, materiale, semi, utenza, altro

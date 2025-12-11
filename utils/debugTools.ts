@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   PLANTS: "serra_plants",
   MATERIALS: "serra_materials",
   PHYTOSANITARY_PRODUCTS: "serra_phytosanitary_products",
+  PENDING_LINES: "serra_pending_invoice_lines",
 };
 
 export async function resetAllData(): Promise<{
@@ -13,12 +14,14 @@ export async function resetAllData(): Promise<{
   plantsDeleted: number;
   materialsDeleted: number;
   productsDeleted: number;
+  pendingLinesDeleted: number;
 }> {
   const result = {
     transactionsDeleted: 0,
     plantsDeleted: 0,
     materialsDeleted: 0,
     productsDeleted: 0,
+    pendingLinesDeleted: 0,
   };
 
   try {
@@ -50,6 +53,13 @@ export async function resetAllData(): Promise<{
     }
     await AsyncStorage.removeItem(STORAGE_KEYS.PHYTOSANITARY_PRODUCTS);
 
+    const pendingJson = await AsyncStorage.getItem(STORAGE_KEYS.PENDING_LINES);
+    if (pendingJson) {
+      const pending = JSON.parse(pendingJson);
+      result.pendingLinesDeleted = Array.isArray(pending) ? pending.length : 0;
+    }
+    await AsyncStorage.removeItem(STORAGE_KEYS.PENDING_LINES);
+
     console.log("[DEBUG] Reset all data:", result);
     return result;
   } catch (error) {
@@ -63,12 +73,14 @@ export async function clearImportedData(): Promise<{
   plantsDeleted: number;
   materialsDeleted: number;
   productsDeleted: number;
+  pendingLinesDeleted: number;
 }> {
   const result = {
     transactionsDeleted: 0,
     plantsDeleted: 0,
     materialsDeleted: 0,
     productsDeleted: 0,
+    pendingLinesDeleted: 0,
   };
 
   try {
@@ -104,6 +116,13 @@ export async function clearImportedData(): Promise<{
       result.productsDeleted = products.length - filtered.length;
       await AsyncStorage.setItem(STORAGE_KEYS.PHYTOSANITARY_PRODUCTS, JSON.stringify(filtered));
     }
+
+    const pendingJson = await AsyncStorage.getItem(STORAGE_KEYS.PENDING_LINES);
+    if (pendingJson) {
+      const pending = JSON.parse(pendingJson);
+      result.pendingLinesDeleted = Array.isArray(pending) ? pending.length : 0;
+    }
+    await AsyncStorage.removeItem(STORAGE_KEYS.PENDING_LINES);
 
     console.log("[DEBUG] Cleared imported data:", result);
     return result;
