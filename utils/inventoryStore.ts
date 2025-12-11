@@ -119,7 +119,18 @@ export const inventoryStore = {
     return await storage.saveProduct(productData);
   },
 
-  async addTransaction(parsedInvoice: ParsedInvoice, categoryId: string): Promise<void> {
+  async addTransaction(parsedInvoice: ParsedInvoice, categoryId: string): Promise<boolean> {
+    const docRef = parsedInvoice.transaction.docRef || '';
+    const counterparty = parsedInvoice.transaction.counterparty || '';
+    
+    if (docRef && counterparty) {
+      const existingTransaction = await storage.findTransactionByDocRef(docRef, counterparty);
+      if (existingTransaction) {
+        console.log('[inventoryStore] Transaction already exists:', existingTransaction.id);
+        return false;
+      }
+    }
+
     const transactionData = {
       type: parsedInvoice.transaction.type,
       categoryId: categoryId,
@@ -135,6 +146,7 @@ export const inventoryStore = {
     };
 
     await storage.saveTransaction(transactionData);
+    return true;
   },
 
   async processInvoiceImport(
@@ -155,8 +167,8 @@ export const inventoryStore = {
     };
 
     try {
-      await this.addTransaction(parsedInvoice, categoryId);
-      result.transactionSaved = true;
+      const saved = await this.addTransaction(parsedInvoice, categoryId);
+      result.transactionSaved = saved;
 
       for (const item of inventoryItems) {
         if (!item.selected) {

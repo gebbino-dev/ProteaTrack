@@ -1,0 +1,66 @@
+Ecco il prompt pronto da incollare all’Agent di Replit:
+
+***
+
+Sto lavorando su ProteaTrack.  
+Ora voglio solo sistemare **reset/import** per evitare dati sporchi e duplicati.
+
+### 1) Sistemare `clearImportedData` per i materiali
+
+Nel file `utils/debugTools.ts` attualmente `clearImportedData` tratta i materiali così:
+
+```ts
+const materialsJson = await AsyncStorage.getItem(STORAGE_KEYS.MATERIALS);
+if (materialsJson) {
+  const materials: any[] = JSON.parse(materialsJson);
+  const filtered = materials.filter(m => m.source !== "import");
+  result.materialsDeleted = materials.length - filtered.length;
+  await AsyncStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(filtered));
+}
+```
+
+Ma in `inventoryStore` i materiali sono salvati come:
+
+```ts
+await AsyncStorage.setItem(KEYS.MATERIALS, JSON.stringify({ materials }));
+```
+
+e il tipo `MaterialRecord` non ha il campo `source`, ha solo `sourceDocument`.
+
+Per favore:
+
+1. Modifica il blocco dei materiali in `clearImportedData` per:
+   - leggere l’oggetto come `{ materials: MaterialRecord[] }`.  
+   - considerare “importati” i materiali la cui `sourceDocument` inizia con `"Fattura"` (stesso criterio usato per le piante).  
+   - salvare di nuovo nel formato `{ materials: filteredMaterials }`.
+
+### 2) Aggiungere controllo anti-duplicato sulle fatture in `inventoryStore`
+
+Nel file `utils/inventoryStore.ts` voglio evitare di importare due volte la stessa fattura (stesso `docRef` + stessa `counterparty`).
+
+1. Nel modulo `storage` (dove esiste `saveTransaction`) aggiungi una funzione:
+
+```ts
+async function findTransactionByDocRef(docRef: string, counterparty: string): Promise<Transaction | null> {
+  // legge tutte le transazioni e restituisce quella che ha stesso docRef e stessa counterparty, oppure null
+}
+```
+
+2. Modifica `addTransaction(parsedInvoice: ParsedInvoice, categoryId: string)` in `inventoryStore` così:
+
+- prima chiama `storage.findTransactionByDocRef(parsedInvoice.transaction.docRef, parsedInvoice.transaction.counterparty)`;  
+- se esiste già una transazione con questi dati, **non** salvarne una nuova e ritorna `false`;  
+- altrimenti salva la transazione come ora e ritorna `true`.
+
+3. In `processInvoiceImport` usa il valore di ritorno:
+
+```ts
+const saved = await this.addTransaction(parsedInvoice, categoryId);
+result.transactionSaved = saved;
+```
+
+Per ora non cambiare altro in `processInvoiceImport`: voglio solo impedire che la stessa fattura crei più volte la stessa transazione e migliorare la pulizia dei materiali importati.
+
+---
+
+Fonti

@@ -90,10 +90,11 @@ export async function clearImportedData(): Promise<{
 
     const materialsJson = await AsyncStorage.getItem(STORAGE_KEYS.MATERIALS);
     if (materialsJson) {
-      const materials: any[] = JSON.parse(materialsJson);
-      const filtered = materials.filter(m => m.source !== "import");
+      const parsed = JSON.parse(materialsJson);
+      const materials: any[] = parsed.materials || [];
+      const filtered = materials.filter(m => !m.sourceDocument?.startsWith("Fattura"));
       result.materialsDeleted = materials.length - filtered.length;
-      await AsyncStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(filtered));
+      await AsyncStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify({ materials: filtered }));
     }
 
     const productsJson = await AsyncStorage.getItem(STORAGE_KEYS.PHYTOSANITARY_PRODUCTS);

@@ -407,6 +407,19 @@ export const storage = {
     });
   },
 
+  async findTransactionByDocRef(docRef: string, counterparty: string): Promise<Transaction | null> {
+    try {
+      const transactions = await this.getTransactions();
+      const found = transactions.find(
+        t => t.docRef === docRef && t.counterparty === counterparty
+      );
+      return found || null;
+    } catch (error) {
+      console.error('Error finding transaction by docRef:', error);
+      return null;
+    }
+  },
+
   async getFinancialSummary(year: number, month?: number): Promise<FinancialSummary> {
     const transactions = await this.getTransactionsByPeriod(year, month);
     const categories = await this.getCategories();
