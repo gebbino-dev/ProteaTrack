@@ -17,30 +17,96 @@ import {
   ItemCategory, 
   CATEGORY_CONFIG 
 } from "@/utils/pendingInvoiceStore";
-import { inventoryStore } from "@/utils/inventoryStore";
+import { inventoryStore, MaterialRecord } from "@/utils/inventoryStore";
 import { storage } from "@/utils/storage";
+import { PlantRecord } from "@/types";
 import { LavoroStackParamList } from "@/navigation/LavoroStackNavigator";
 
 type MagazzinoScreenProps = {
   navigation: NativeStackNavigationProp<LavoroStackParamList, "Lavoro">;
 };
 
+type InventoryCategory = 'tutti' | 'piante' | 'semi' | 'vasi' | 'terriccio' | 'materiali';
+
+interface InventoryItem {
+  id: string;
+  name: string;
+  category: InventoryCategory;
+  quantity: number;
+  unitOfMeasure: string;
+  date: string;
+  notes?: string;
+  sourceDocument?: string;
+}
+
+const INVENTORY_TABS: { key: InventoryCategory; label: string; icon: string }[] = [
+  { key: 'tutti', label: 'Tutti', icon: 'grid' },
+  { key: 'piante', label: 'Piante', icon: 'sun' },
+  { key: 'semi', label: 'Semi', icon: 'disc' },
+  { key: 'vasi', label: 'Vasi', icon: 'box' },
+  { key: 'terriccio', label: 'Terriccio', icon: 'layers' },
+  { key: 'materiali', label: 'Materiali', icon: 'tool' },
+];
+
 export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
   const { theme } = useTheme();
   const tabBarHeight = useBottomTabBarHeight();
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [pendingLines, setPendingLines] = useState<PendingInvoiceLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedTab, setSelectedTab] = useState<InventoryCategory>('tutti');
   const [selectedLine, setSelectedLine] = useState<PendingInvoiceLine | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [filterCategory, setFilterCategory] = useState<ItemCategory | null>(null);
+  const [showPending, setShowPending] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
-      const lines = await pendingInvoiceStore.getUnprocessedLines();
-      setPendingLines(lines);
+      const [plantInventory, materials, pending] = await Promise.all([
+        storage.getPlantInventory(),
+        inventoryStore.getMaterials(),
+        pendingInvoiceStore.getUnprocessedLines(),
+      ]);
+
+      const items: InventoryItem[] = [];
+
+      plantInventory.plants.forEach((plant: PlantRecord) => {
+        const isSeed = plant.variety.startsWith('[Semi]') || plant.notes?.includes('SEMI');
+        items.push({
+          id: plant.id,
+          name: plant.variety.replace('[Semi] ', ''),
+          category: isSeed ? 'semi' : 'piante',
+          quantity: plant.quantity,
+          unitOfMeasure: 'pz',
+          date: plant.arrivalDate,
+          notes: plant.notes,
+          sourceDocument: plant.sourceDocument,
+        });
+      });
+
+      materials.forEach((mat: MaterialRecord) => {
+        let category: InventoryCategory = 'materiali';
+        if (mat.type === 'vasi') category = 'vasi';
+        else if (mat.type === 'terriccio') category = 'terriccio';
+        
+        items.push({
+          id: mat.id,
+          name: mat.name,
+          category,
+          quantity: mat.quantity,
+          unitOfMeasure: mat.unitOfMeasure,
+          date: mat.arrivalDate,
+          notes: mat.notes,
+          sourceDocument: mat.sourceDocument,
+        });
+      });
+
+      items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      setInventoryItems(items);
+      setPendingLines(pending);
     } catch (error) {
-      console.error("Error loading pending lines:", error);
+      console.error("Error loading inventory:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -191,21 +257,40 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
     }
   };
 
-  const categorySummary = pendingLines.reduce((acc, line) => {
-    const cat = line.assignedCategory;
-    if (!acc[cat]) {
-      acc[cat] = { count: 0, total: 0 };
-    }
-    acc[cat].count++;
-    acc[cat].total += line.totalPrice;
-    return acc;
-  }, {} as Record<ItemCategory, { count: number; total: number }>);
+  const filteredItems = selectedTab === 'tutti'
+    ? inventoryItems
+    : inventoryItems.filter(item => item.category === selectedTab);
 
-  const filteredLines = filterCategory
-    ? pendingLines.filter(l => l.assignedCategory === filterCategory)
-    : pendingLines;
+  const getCategoryCounts = () => {
+    const counts: Record<InventoryCategory, number> = {
+      tutti: inventoryItems.length,
+      piante: 0,
+      semi: 0,
+      vasi: 0,
+      terriccio: 0,
+      materiali: 0,
+    };
+    inventoryItems.forEach(item => {
+      if (counts[item.category] !== undefined) {
+        counts[item.category]++;
+      }
+    });
+    return counts;
+  };
 
+  const categoryCounts = getCategoryCounts();
   const categories = Object.keys(CATEGORY_CONFIG) as ItemCategory[];
+
+  const getCategoryColor = (cat: InventoryCategory): string => {
+    switch (cat) {
+      case 'piante': return '#4CAF50';
+      case 'semi': return '#8BC34A';
+      case 'vasi': return '#FF9800';
+      case 'terriccio': return '#795548';
+      case 'materiali': return '#607D8B';
+      default: return theme.primary;
+    }
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -215,88 +300,63 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
         }
       >
         <View style={styles.statsRow}>
-          <View
-            style={[styles.statCard, { backgroundColor: theme.backgroundDefault }]}
+          <View style={[styles.statCard, { backgroundColor: theme.backgroundDefault }]}>
+            <Feather name="package" size={20} color={theme.primary} />
+            <ThemedText type="h3" style={styles.statValue}>
+              {inventoryItems.length}
+            </ThemedText>
+            <ThemedText style={[styles.statLabel, { color: theme.textSecondary }]}>
+              Articoli
+            </ThemedText>
+          </View>
+          <Pressable
+            style={[styles.statCard, { backgroundColor: pendingLines.length > 0 ? theme.warning + '20' : theme.backgroundDefault }]}
+            onPress={() => setShowPending(!showPending)}
           >
-            <Feather name="inbox" size={20} color={theme.primary} />
+            <Feather name="inbox" size={20} color={pendingLines.length > 0 ? theme.warning : theme.textSecondary} />
             <ThemedText type="h3" style={styles.statValue}>
               {pendingLines.length}
             </ThemedText>
             <ThemedText style={[styles.statLabel, { color: theme.textSecondary }]}>
-              Da Assegnare
+              In Attesa
             </ThemedText>
-          </View>
-          <View
-            style={[styles.statCard, { backgroundColor: theme.backgroundDefault }]}
-          >
-            <Feather name="check-circle" size={20} color={theme.success} />
-            <ThemedText type="h3" style={styles.statValue}>
-              {Object.keys(categorySummary).length}
-            </ThemedText>
-            <ThemedText style={[styles.statLabel, { color: theme.textSecondary }]}>
-              Categorie
-            </ThemedText>
-          </View>
+          </Pressable>
         </View>
 
         <Spacer height={Spacing.lg} />
 
-        <ThemedText type="h4" style={styles.sectionTitle}>
-          Filtra per Categoria
-        </ThemedText>
-        <Spacer height={Spacing.sm} />
-
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.filterRow}>
-            <Pressable
-              onPress={() => setFilterCategory(null)}
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor: !filterCategory
-                    ? theme.primary
-                    : theme.backgroundDefault,
-                },
-              ]}
-            >
-              <ThemedText
-                style={[
-                  styles.filterText,
-                  { color: !filterCategory ? "#FFFFFF" : theme.text },
-                ]}
-              >
-                Tutte ({pendingLines.length})
-              </ThemedText>
-            </Pressable>
-            {categories.map((cat) => {
-              const config = CATEGORY_CONFIG[cat];
-              const count = categorySummary[cat]?.count || 0;
-              if (count === 0) return null;
+          <View style={styles.tabRow}>
+            {INVENTORY_TABS.map((tab) => {
+              const isActive = selectedTab === tab.key;
+              const count = categoryCounts[tab.key];
+              const color = getCategoryColor(tab.key);
               
               return (
                 <Pressable
-                  key={cat}
-                  onPress={() => setFilterCategory(filterCategory === cat ? null : cat)}
+                  key={tab.key}
+                  onPress={() => setSelectedTab(tab.key)}
                   style={[
-                    styles.filterChip,
+                    styles.tabChip,
                     {
-                      backgroundColor:
-                        filterCategory === cat ? config.color : theme.backgroundDefault,
+                      backgroundColor: isActive ? color : theme.backgroundDefault,
+                      borderColor: isActive ? color : theme.backgroundSecondary,
+                      borderWidth: 1,
                     },
                   ]}
                 >
                   <Feather
-                    name={config.icon as any}
+                    name={tab.icon as any}
                     size={14}
-                    color={filterCategory === cat ? "#FFFFFF" : config.color}
+                    color={isActive ? "#FFFFFF" : color}
                   />
                   <ThemedText
                     style={[
-                      styles.filterText,
-                      { color: filterCategory === cat ? "#FFFFFF" : theme.text },
+                      styles.tabText,
+                      { color: isActive ? "#FFFFFF" : theme.text },
                     ]}
                   >
-                    {config.label} ({count})
+                    {tab.label} ({count})
                   </ThemedText>
                 </Pressable>
               );
@@ -306,108 +366,151 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
 
         <Spacer height={Spacing.xl} />
 
+        {showPending && pendingLines.length > 0 ? (
+          <>
+            <View style={styles.sectionHeader}>
+              <ThemedText type="h4">Righe da Confermare ({pendingLines.length})</ThemedText>
+              <Pressable onPress={() => setShowPending(false)}>
+                <Feather name="x" size={20} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+            <Spacer height={Spacing.md} />
+
+            {pendingLines.map((line) => {
+              const catConfig = CATEGORY_CONFIG[line.assignedCategory];
+              
+              return (
+                <View
+                  key={line.id}
+                  style={[styles.pendingCard, { backgroundColor: theme.warning + '10', borderColor: theme.warning + '30' }]}
+                >
+                  <View style={styles.lineHeader}>
+                    <View style={[styles.categoryBadge, { backgroundColor: catConfig.color + '20' }]}>
+                      <Feather name={catConfig.icon as any} size={14} color={catConfig.color} />
+                      <ThemedText style={[styles.categoryText, { color: catConfig.color }]}>
+                        {catConfig.label}
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  <Spacer height={Spacing.sm} />
+
+                  <ThemedText style={styles.lineDescription} numberOfLines={2}>
+                    {line.description}
+                  </ThemedText>
+
+                  <ThemedText style={[styles.invoiceRef, { color: theme.textSecondary }]}>
+                    Qta: {line.quantity} - {line.totalPrice.toFixed(2)} EUR
+                  </ThemedText>
+
+                  <Spacer height={Spacing.md} />
+
+                  <View style={styles.actionRow}>
+                    <Pressable
+                      style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+                      onPress={() => {
+                        setSelectedLine(line);
+                        setModalVisible(true);
+                      }}
+                    >
+                      <Feather name="edit-2" size={16} color={theme.text} />
+                      <ThemedText style={styles.actionText}>Cambia</ThemedText>
+                    </Pressable>
+
+                    <Pressable
+                      style={[styles.actionButton, { backgroundColor: theme.success + '20' }]}
+                      onPress={() => handleConfirmLine(line)}
+                    >
+                      <Feather name="check" size={16} color={theme.success} />
+                      <ThemedText style={[styles.actionText, { color: theme.success }]}>
+                        Conferma
+                      </ThemedText>
+                    </Pressable>
+
+                    <Pressable
+                      style={[styles.actionButton, { backgroundColor: theme.error + '20' }]}
+                      onPress={() => handleDeleteLine(line)}
+                    >
+                      <Feather name="trash-2" size={16} color={theme.error} />
+                    </Pressable>
+                  </View>
+                </View>
+              );
+            })}
+
+            <Spacer height={Spacing.xl} />
+          </>
+        ) : null}
+
         <ThemedText type="h4" style={styles.sectionTitle}>
-          Righe Fattura ({filteredLines.length})
+          Inventario ({filteredItems.length})
         </ThemedText>
         <Spacer height={Spacing.md} />
 
-        {filteredLines.length === 0 ? (
-          <View
-            style={[styles.emptyState, { backgroundColor: theme.backgroundDefault }]}
-          >
+        {filteredItems.length === 0 ? (
+          <View style={[styles.emptyState, { backgroundColor: theme.backgroundDefault }]}>
             <Feather
-              name="inbox"
+              name="package"
               size={48}
               color={theme.tabIconDefault}
               style={styles.emptyIcon}
             />
             <ThemedText style={styles.emptyText}>
-              Nessuna riga da assegnare
+              {selectedTab === 'tutti' ? 'Magazzino vuoto' : `Nessun articolo in ${INVENTORY_TABS.find(t => t.key === selectedTab)?.label}`}
             </ThemedText>
-            <ThemedText
-              style={[styles.emptySubtext, { color: theme.textSecondary }]}
-            >
-              Importa una fattura XML dalla sezione Contabilita
+            <ThemedText style={[styles.emptySubtext, { color: theme.textSecondary }]}>
+              Importa fatture XML dalla sezione Contabilita
             </ThemedText>
           </View>
         ) : (
-          filteredLines.map((line) => {
-            const catConfig = CATEGORY_CONFIG[line.assignedCategory];
-            const wasAutoDetected = line.detectedCategory === line.assignedCategory;
+          filteredItems.map((item) => {
+            const color = getCategoryColor(item.category);
+            const tabInfo = INVENTORY_TABS.find(t => t.key === item.category);
             
             return (
               <View
-                key={line.id}
-                style={[styles.lineCard, { backgroundColor: theme.backgroundDefault }]}
+                key={item.id}
+                style={[styles.itemCard, { backgroundColor: theme.backgroundDefault }]}
               >
-                <View style={styles.lineHeader}>
-                  <View style={[styles.categoryBadge, { backgroundColor: catConfig.color + '20' }]}>
-                    <Feather name={catConfig.icon as any} size={14} color={catConfig.color} />
-                    <ThemedText style={[styles.categoryText, { color: catConfig.color }]}>
-                      {catConfig.label}
+                <View style={styles.itemHeader}>
+                  <View style={[styles.categoryBadge, { backgroundColor: color + '20' }]}>
+                    <Feather name={(tabInfo?.icon || 'box') as any} size={14} color={color} />
+                    <ThemedText style={[styles.categoryText, { color }]}>
+                      {tabInfo?.label || item.category}
                     </ThemedText>
                   </View>
-                  {!wasAutoDetected ? (
-                    <View style={[styles.manualBadge, { backgroundColor: theme.warning + '20' }]}>
-                      <ThemedText style={[styles.manualText, { color: theme.warning }]}>
-                        Modificato
-                      </ThemedText>
-                    </View>
-                  ) : null}
+                  <ThemedText style={[styles.itemDate, { color: theme.textSecondary }]}>
+                    {item.date}
+                  </ThemedText>
                 </View>
 
                 <Spacer height={Spacing.sm} />
 
-                <ThemedText style={styles.lineDescription} numberOfLines={2}>
-                  {line.description}
+                <ThemedText style={styles.itemName} numberOfLines={2}>
+                  {item.name}
                 </ThemedText>
 
                 <Spacer height={Spacing.xs} />
 
-                <View style={styles.lineDetails}>
-                  <ThemedText style={[styles.lineInfo, { color: theme.textSecondary }]}>
-                    Qta: {line.quantity} {line.unitOfMeasure || 'pz'}
+                <View style={styles.itemDetails}>
+                  <ThemedText style={[styles.itemQuantity, { color: theme.primary }]}>
+                    {item.quantity} {item.unitOfMeasure}
                   </ThemedText>
-                  <ThemedText style={[styles.linePrice, { color: theme.primary }]}>
-                    {line.totalPrice.toFixed(2)} EUR
-                  </ThemedText>
-                </View>
-
-                <ThemedText style={[styles.invoiceRef, { color: theme.textSecondary }]}>
-                  {line.invoiceNumber} del {line.invoiceDate} - {line.supplierName}
-                </ThemedText>
-
-                <Spacer height={Spacing.md} />
-
-                <View style={styles.actionRow}>
-                  <Pressable
-                    style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
-                    onPress={() => {
-                      setSelectedLine(line);
-                      setModalVisible(true);
-                    }}
-                  >
-                    <Feather name="edit-2" size={16} color={theme.text} />
-                    <ThemedText style={styles.actionText}>Cambia</ThemedText>
-                  </Pressable>
-
-                  <Pressable
-                    style={[styles.actionButton, { backgroundColor: theme.success + '20' }]}
-                    onPress={() => handleConfirmLine(line)}
-                  >
-                    <Feather name="check" size={16} color={theme.success} />
-                    <ThemedText style={[styles.actionText, { color: theme.success }]}>
-                      Conferma
+                  {item.sourceDocument ? (
+                    <ThemedText style={[styles.itemSource, { color: theme.textSecondary }]} numberOfLines={1}>
+                      {item.sourceDocument}
                     </ThemedText>
-                  </Pressable>
-
-                  <Pressable
-                    style={[styles.actionButton, { backgroundColor: theme.error + '20' }]}
-                    onPress={() => handleDeleteLine(line)}
-                  >
-                    <Feather name="trash-2" size={16} color={theme.error} />
-                  </Pressable>
+                  ) : null}
                 </View>
+
+                {item.notes ? (
+                  <>
+                    <Spacer height={Spacing.xs} />
+                    <ThemedText style={[styles.itemNotes, { color: theme.textSecondary }]} numberOfLines={2}>
+                      {item.notes}
+                    </ThemedText>
+                  </>
+                ) : null}
               </View>
             );
           })
@@ -498,12 +601,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginBottom: Spacing.xs,
   },
-  filterRow: {
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  tabRow: {
     flexDirection: "row",
     gap: Spacing.sm,
     paddingRight: Spacing.xl,
   },
-  filterChip: {
+  tabChip: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: Spacing.md,
@@ -511,7 +619,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
     gap: Spacing.xs,
   },
-  filterText: {
+  tabText: {
     fontSize: 13,
     fontWeight: "500",
   },
@@ -533,10 +641,46 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 14,
   },
-  lineCard: {
+  itemCard: {
     padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.md,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  itemDate: {
+    fontSize: 12,
+  },
+  itemName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  itemDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  itemQuantity: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  itemSource: {
+    fontSize: 11,
+    flex: 1,
+    textAlign: 'right',
+    marginLeft: Spacing.md,
+  },
+  itemNotes: {
+    fontSize: 12,
+  },
+  pendingCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
   },
   lineHeader: {
     flexDirection: 'row',
@@ -555,33 +699,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  manualBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  manualText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
   lineDescription: {
     fontSize: 15,
     fontWeight: '500',
   },
-  lineDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  lineInfo: {
-    fontSize: 13,
-  },
-  linePrice: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
   invoiceRef: {
-    fontSize: 11,
+    fontSize: 12,
     marginTop: Spacing.xs,
   },
   actionRow: {
