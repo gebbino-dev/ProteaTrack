@@ -57,8 +57,8 @@ export interface InventoryImportItem {
 }
 
 function getTextContent(xml: string, tagName: string): string | null {
-  const regex = new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'i');
-  const match = xml.match(regex);
+  const regexWithNs = new RegExp(`<(?:[a-z0-9]+:)?${tagName}[^>]*>([\\s\\S]*?)<\\/(?:[a-z0-9]+:)?${tagName}>`, 'i');
+  const match = xml.match(regexWithNs);
   if (match) {
     return match[1].trim().replace(/<!\[CDATA\[|\]\]>/g, '');
   }
@@ -66,8 +66,8 @@ function getTextContent(xml: string, tagName: string): string | null {
 }
 
 function getAllElements(xml: string, tagName: string): string[] {
-  const regex = new RegExp(`<${tagName}[^>]*>[\\s\\S]*?<\\/${tagName}>`, 'gi');
-  const matches = xml.match(regex);
+  const regexWithNs = new RegExp(`<(?:[a-z0-9]+:)?${tagName}[^>]*>[\\s\\S]*?<\\/(?:[a-z0-9]+:)?${tagName}>`, 'gi');
+  const matches = xml.match(regexWithNs);
   return matches || [];
 }
 
@@ -106,28 +106,44 @@ function detectItemType(description: string): InvoiceLineItem['itemType'] {
     return 'piante';
   }
   
-  if (desc.includes('vaso') || desc.includes('vasi') || desc.includes('contenitor')) {
+  if (desc.includes('vaso') || desc.includes('vasi') || 
+      desc.includes('vassoio') || desc.includes('contenitor') ||
+      desc.includes('placca')) {
     return 'vasi';
   }
   
   if (desc.includes('terriccio') || desc.includes('substrato') || 
-      desc.includes('torba') || desc.includes('perlite')) {
+      desc.includes('torba') || desc.includes('perlite') ||
+      desc.includes('floratoscana 2')) {
     return 'terriccio';
   }
   
   if (desc.includes('fitofarmaco') || desc.includes('fungicida') ||
       desc.includes('insetticida') || desc.includes('acaricida') ||
-      desc.includes('erbicida') || desc.includes('antiparassitario')) {
+      desc.includes('erbicida') || desc.includes('antiparassitario') ||
+      desc.includes('decis') || desc.includes('previter') ||
+      desc.includes('affirm') || desc.includes('karate') ||
+      desc.includes('roundup') || desc.includes('costar') ||
+      desc.includes('katar') || desc.includes('neem') ||
+      desc.includes('-clp-')) {
     return 'fitofarmaco';
   }
   
   if (desc.includes('fertilizzante') || desc.includes('concime') ||
       desc.includes('npk') || desc.includes('azoto') ||
-      desc.includes('fosforo') || desc.includes('potassio')) {
+      desc.includes('fosforo') || desc.includes('potassio') ||
+      desc.includes('solfato') || desc.includes('calcium') ||
+      desc.includes('kelpak') || desc.includes('haifastim') ||
+      desc.includes('acido solforico')) {
     return 'fertilizzante';
   }
   
-  return 'altro';
+  if (desc.includes('contributo') || desc.includes('costi amministrativi') ||
+      desc.includes('conai')) {
+    return 'altro';
+  }
+  
+  return 'materiale';
 }
 
 function parseParty(partyXml: string): InvoiceParty {

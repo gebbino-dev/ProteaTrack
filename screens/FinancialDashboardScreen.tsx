@@ -241,6 +241,19 @@ export default function FinancialDashboardScreen() {
           <ThemedText style={styles.viewAllText}>Vedi Tutti i Movimenti</ThemedText>
           <Feather name="chevron-right" size={20} color={theme.text} />
         </Pressable>
+
+        <Pressable
+          onPress={() => navigation.navigate('InvoiceImport')}
+          style={({ pressed }) => [
+            styles.importButton,
+            { backgroundColor: theme.backgroundDefault, borderColor: theme.primary, opacity: pressed ? 0.8 : 1 }
+          ]}
+        >
+          <Feather name="file-text" size={20} color={theme.primary} />
+          <ThemedText style={[styles.importButtonText, { color: theme.primary }]}>
+            Importa Fattura XML
+          </ThemedText>
+        </Pressable>
       </View>
 
       <Pressable
@@ -416,6 +429,19 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontWeight: '500',
+  },
+  importButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 2,
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  importButtonText: {
+    fontWeight: '600',
   },
   fab: {
     position: 'absolute',
