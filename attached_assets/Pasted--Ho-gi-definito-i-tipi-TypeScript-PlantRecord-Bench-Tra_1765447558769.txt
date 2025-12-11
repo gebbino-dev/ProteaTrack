@@ -1,0 +1,50 @@
+> Ho già definito i tipi TypeScript `PlantRecord`, `Bench`, `Transaction`, `TransactionCategory`, `FinancialSummary` ecc. in `index.ts` (non modificarli).  
+> Ti allego diversi file XML di **fattura elettronica italiana** (acquisti e vendite), sia con poche righe sia con molte righe di dettaglio.  
+> 
+> Obiettivo: voglio un modulo di import che legga queste fatture XML e tiri fuori TUTTI i dati utili per la mia app:
+> - dati contabili generali (fornitore/cliente, numero fattura, data, imponibile, imposta, totale, aliquote IVA) per creare una `Transaction`  
+> - dati di magazzino agricolo da ogni riga (`DettaglioLinee`): numero piante, numero vasi, quantità terriccio, altri materiali, ecc.  
+> 
+> 1. Crea un file `xmlImportService.ts` che contenga:
+>    - una funzione `parseInvoiceXml(xmlString: string)` che:
+>      - legge l’XML di fattura elettronica italiana (standard SDI)  
+>      - estrae:
+>        - dati generali da `DatiGeneraliDocumento` (tipo documento, numero, data, causale)  
+>        - dati del fornitore/cliente da `CedentePrestatore` e `CessionarioCommittente`  
+>        - righe da `DettaglioLinee` con descrizione, quantità, prezzo unitario, aliquota IVA  
+>        - riepilogo IVA da `DatiRiepilogo`  
+>      - costruisce:
+>        - un oggetto `Transaction` con:
+>          - `id` generato (uuid)  
+>          - `type` = `'costo'` per acquisti, `'ricavo'` per vendite  
+>          - `amount` (usa il totale imponibile o totale documento, specifica quale)  
+>          - `date`  
+>          - `counterparty` (denominazione fornitore o cliente)  
+>          - `description` (numero + breve descrizione)  
+>          - `vatRate` principale  
+>          - `docRef` (numero fattura)  
+>          - `docType` (tipo documento FE)  
+>          - `source` = `'import'`  
+>        - una lista di “item di magazzino” a partire dalle righe, in modo che io possa poi trasformarle in:
+>          - `PlantRecord` per lotti di piante  
+>          - movimenti di vasi, terricci, materiali
+>    - tipizza bene il risultato, ad esempio:
+>      ```ts
+>      interface ParsedInvoice {
+>        transaction: Transaction;
+>        lineItems: {
+>          description: string;
+>          quantity: number;
+>          unitPrice: number;
+>          unitOfMeasure?: string;
+>          vatRate?: number;
+>        }[];
+>      }
+>      ```
+> 2. La funzione deve essere abbastanza robusta da gestire:
+>    - più righe prodotto  
+>    - diverse aliquote IVA  
+>    - fatture di acquisto e di vendita  
+> 
+> Non usare OCR: lavora solo sui tag XML.  
+> Usa i nomi dei tag standard delle fatture elettroniche italiane che vedi negli XML allegati (es. `DatiGeneraliDocumento`, `DatiBeniServizi`, `DettaglioLinee`, `DatiRiepilogo`).

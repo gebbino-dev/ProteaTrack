@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ns2:FatturaElettronica versione="FPR12" xmlns:ns2="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2">
+<FatturaElettronicaHeader>
+<DatiTrasmissione>
+<IdTrasmittente>
+<IdPaese>IT</IdPaese>
+<IdCodice>01879020517</IdCodice>
+</IdTrasmittente>
+<ProgressivoInvio>01222</ProgressivoInvio>
+<FormatoTrasmissione>FPR12</FormatoTrasmissione>
+<CodiceDestinatario>6RB0OU9</CodiceDestinatario>
+<ContattiTrasmittente>
+<Telefono>05750505</Telefono>
+<Email>info@arubapec.it</Email>
+</ContattiTrasmittente>
+</DatiTrasmissione>
+<CedentePrestatore>
+<DatiAnagrafici>
+<IdFiscaleIVA>
+<IdPaese>IT</IdPaese>
+<IdCodice>01551230475</IdCodice>
+</IdFiscaleIVA>
+<CodiceFiscale>MLNNCL72S06G491S</CodiceFiscale>
+<Anagrafica>
+<Denominazione>Nicola Impianti di Nicola Molini</Denominazione>
+</Anagrafica>
+<RegimeFiscale>RF01</RegimeFiscale>
+</DatiAnagrafici>
+<Sede>
+<Indirizzo>Via Lucchese , 262</Indirizzo>
+<CAP>51017</CAP>
+<Comune>Pescia</Comune>
+<Provincia>PT</Provincia>
+<Nazione>IT</Nazione>
+</Sede>
+<Contatti>
+<Telefono>347/3409301</Telefono>
+<Email>nicolamolini@gmail.com</Email>
+</Contatti>
+</CedentePrestatore>
+<CessionarioCommittente>
+<DatiAnagrafici>
+<IdFiscaleIVA>
+<IdPaese>IT</IdPaese>
+<IdCodice>01747200473</IdCodice>
+</IdFiscaleIVA>
+<Anagrafica>
+<Denominazione>VIVAI SIMONCINI soc.agr.</Denominazione>
+</Anagrafica>
+</DatiAnagrafici>
+<Sede>
+<Indirizzo>VIA PERONDI , 4</Indirizzo>
+<CAP>51017</CAP>
+<Comune>PESCIA</Comune>
+<Provincia>PT</Provincia>
+<Nazione>IT</Nazione>
+</Sede>
+</CessionarioCommittente>
+</FatturaElettronicaHeader>
+<FatturaElettronicaBody>
+<DatiGenerali>
+<DatiGeneraliDocumento>
+<TipoDocumento>TD01</TipoDocumento>
+<Divisa>EUR</Divisa>
+<Data>2025-08-21</Data>
+<Numero>126</Numero>
+<ImportoTotaleDocumento>10980.00</ImportoTotaleDocumento>
+</DatiGeneraliDocumento>
+</DatiGenerali>
+<DatiBeniServizi>
+<DettaglioLinee>
+<NumeroLinea>1</NumeroLinea>
+<Descrizione>FATTURA DI ACCONTO PER LAVORI DI INSTALLAZIONE IMPIANTO FOTOVOLTAICO PRESSO VOSTRA AZIENDA VIA PERONDI , 4 PESCIA (PT)</Descrizione>
+<Quantita>1.00</Quantita>
+<UnitaMisura>N</UnitaMisura>
+<PrezzoUnitario>9000.00</PrezzoUnitario>
+<PrezzoTotale>9000.00</PrezzoTotale>
+<AliquotaIVA>22.00</AliquotaIVA>
+</DettaglioLinee>
+<DettaglioLinee>
+<NumeroLinea>2</NumeroLinea>
+<Descrizione>DOCUMENTO DI CORTESIA NON VALIDO AI FINI FISCALI</Descrizione>
+<PrezzoUnitario>0.00</PrezzoUnitario>
+<PrezzoTotale>0.00</PrezzoTotale>
+<AliquotaIVA>22.00</AliquotaIVA>
+</DettaglioLinee>
+<DettaglioLinee>
+<NumeroLinea>3</NumeroLinea>
+<Descrizione>.</Descrizione>
+<PrezzoUnitario>0.00</PrezzoUnitario>
+<PrezzoTotale>0.00</PrezzoTotale>
+<AliquotaIVA>22.00</AliquotaIVA>
+<AltriDatiGestionali>
+<TipoDato>INFO</TipoDato>
+<RiferimentoTesto>IN CONTO</RiferimentoTesto>
+</AltriDatiGestionali>
+</DettaglioLinee>
+<DatiRiepilogo>
+<AliquotaIVA>22.00</AliquotaIVA>
+<ImponibileImporto>9000.00</ImponibileImporto>
+<Imposta>1980.00</Imposta>
+<EsigibilitaIVA>I</EsigibilitaIVA>
+</DatiRiepilogo>
+</DatiBeniServizi>
+<DatiPagamento>
+<CondizioniPagamento>TP02</CondizioniPagamento>
+<DettaglioPagamento>
+<ModalitaPagamento>MP05</ModalitaPagamento>
+<DataScadenzaPagamento>2025-08-21</DataScadenzaPagamento>
+<ImportoPagamento>10980.00</ImportoPagamento>
+<IstitutoFinanziario>BANCA TRASIMENO ORVIETANO CREDITO COOPERATIVO SCRL</IstitutoFinanziario>
+<IBAN>IT26M0707570462000000212742</IBAN>
+</DettaglioPagamento>
+</DatiPagamento>
+</FatturaElettronicaBody>
+</ns2:FatturaElettronica>

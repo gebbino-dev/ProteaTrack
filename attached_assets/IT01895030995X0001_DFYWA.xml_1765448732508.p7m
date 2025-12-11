@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<p:FatturaElettronica xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" versione="FPR12" xsi:schemaLocation="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2 fatturaordinaria_v1.2.xsd">
+
+<FatturaElettronicaHeader>
+<DatiTrasmissione>
+<IdTrasmittente>
+<IdPaese>IT</IdPaese>
+<IdCodice>01895030995</IdCodice>
+</IdTrasmittente>
+<ProgressivoInvio>X0001DFYWA</ProgressivoInvio>
+<FormatoTrasmissione>FPR12</FormatoTrasmissione>
+<CodiceDestinatario>6RB0OU9</CodiceDestinatario>
+
+</DatiTrasmissione>
+<CedentePrestatore>
+<DatiAnagrafici>
+<IdFiscaleIVA>
+<IdPaese>IT</IdPaese>
+<IdCodice>01533680474</IdCodice>
+</IdFiscaleIVA>
+<CodiceFiscale>01533680474</CodiceFiscale>
+<Anagrafica>
+<Denominazione>N.G. NICCOLAI S.R.L.</Denominazione>
+</Anagrafica>
+<RegimeFiscale>RF01</RegimeFiscale>
+</DatiAnagrafici>
+<Sede>
+<Indirizzo>VIA PRATESE, 546/C - CHIAZZANO</Indirizzo>
+<CAP>51100</CAP>
+<Comune>PISTOIA</Comune>
+<Provincia>PT</Provincia>
+<Nazione>IT</Nazione>
+</Sede>
+<IscrizioneREA>
+<Ufficio>PT</Ufficio>
+<NumeroREA>157778</NumeroREA>
+<CapitaleSociale>50000.00</CapitaleSociale>
+<SocioUnico>SM</SocioUnico>
+<StatoLiquidazione>LN</StatoLiquidazione>
+</IscrizioneREA>
+<Contatti>
+<Telefono>0573 530179</Telefono>
+<Email>info@ngniccolai.com</Email>
+</Contatti>
+</CedentePrestatore>
+<CessionarioCommittente>
+<DatiAnagrafici>
+<IdFiscaleIVA>
+<IdPaese>IT</IdPaese>
+<IdCodice>01747200473</IdCodice>
+</IdFiscaleIVA>
+<CodiceFiscale>01747200473</CodiceFiscale>
+<Anagrafica>
+<Denominazione>SOC.AGR. VIVAI SIMONCINI</Denominazione>
+</Anagrafica>
+</DatiAnagrafici>
+<Sede>
+<Indirizzo>VIA PERONDI N. 4</Indirizzo>
+<CAP>51012</CAP>
+<Comune>PESCIA</Comune>
+<Provincia>PT</Provincia>
+<Nazione>IT</Nazione>
+</Sede>
+</CessionarioCommittente>
+<TerzoIntermediarioOSoggettoEmittente><DatiAnagrafici><IdFiscaleIVA><IdPaese>IT</IdPaese><IdCodice>01895030995</IdCodice></IdFiscaleIVA><Anagrafica><Denominazione>CompEd Servizi Srl - Società a socio unico</Denominazione></Anagrafica></DatiAnagrafici></TerzoIntermediarioOSoggettoEmittente><SoggettoEmittente>TZ</SoggettoEmittente></FatturaElettronicaHeader>
+
+<FatturaElettronicaBody>
+<DatiGenerali>
+<DatiGeneraliDocumento>
+<TipoDocumento>TD24</TipoDocumento>
+<Divisa>EUR</Divisa>
+<Data>2025-01-31</Data>
+<Numero>203</Numero>
+<ImportoTotaleDocumento>177.63</ImportoTotaleDocumento>
+<Causale>SCARICO A CLIENTI</Causale>
+</DatiGeneraliDocumento>
+<DatiDDT>
+<NumeroDDT>501</NumeroDDT>
+<DataDDT>2025-01-22</DataDDT>
+<RiferimentoNumeroLinea>1</RiferimentoNumeroLinea>
+</DatiDDT>
+</DatiGenerali>
+<DatiBeniServizi>
+<DettaglioLinee>
+<NumeroLinea>1</NumeroLinea>
+<CodiceArticolo>
+<CodiceTipo>CODART</CodiceTipo>
+<CodiceValore>ELP11AV</CodiceValore>
+</CodiceArticolo>
+<Descrizione>LEGACCI BIOD. LEGATRICE ATTALINK NATURAL</Descrizione>
+<Quantita>40.0000</Quantita>
+<UnitaMisura>N.</UnitaMisura>
+<PrezzoUnitario>3.6400</PrezzoUnitario>
+<PrezzoTotale>145.60</PrezzoTotale>
+<AliquotaIVA>22.00</AliquotaIVA>
+</DettaglioLinee>
+<DatiRiepilogo>
+<AliquotaIVA>22.00</AliquotaIVA>
+<ImponibileImporto>145.60</ImponibileImporto>
+<Imposta>32.03</Imposta>
+<EsigibilitaIVA>I</EsigibilitaIVA>
+</DatiRiepilogo>
+</DatiBeniServizi>
+<DatiPagamento>
+<CondizioniPagamento>TP02</CondizioniPagamento>
+<DettaglioPagamento>
+<ModalitaPagamento>MP01</ModalitaPagamento>
+<DataScadenzaPagamento>2025-02-01</DataScadenzaPagamento>
+<ImportoPagamento>177.63</ImportoPagamento>
+</DettaglioPagamento>
+</DatiPagamento>
+</FatturaElettronicaBody>
+
+</p:FatturaElettronica>
