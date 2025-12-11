@@ -129,6 +129,26 @@ export default function GreenhouseListScreen({ navigation }: GreenhouseListScree
 
   return (
     <ScreenScrollView>
+      <Pressable
+        style={[styles.availablePlantsCard, { backgroundColor: theme.primary }]}
+        onPress={() => navigation.navigate("AvailablePlants")}
+      >
+        <View style={styles.availablePlantsIcon}>
+          <Feather name="package" size={24} color="#FFFFFF" />
+        </View>
+        <View style={styles.availablePlantsInfo}>
+          <ThemedText type="h4" style={{ color: "#FFFFFF" }}>
+            Piante Disponibili
+          </ThemedText>
+          <ThemedText style={{ color: "rgba(255,255,255,0.8)", fontSize: 13 }}>
+            Gestisci magazzino e distribuisci ai settori
+          </ThemedText>
+        </View>
+        <Feather name="chevron-right" size={24} color="#FFFFFF" />
+      </Pressable>
+
+      <View style={{ height: Spacing.xl }} />
+
       <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing.lg }}>
         Seleziona una serra per visualizzare i settori e i bancali
       </ThemedText>
@@ -152,6 +172,24 @@ export default function GreenhouseListScreen({ navigation }: GreenhouseListScree
 }
 
 const styles = StyleSheet.create({
+  availablePlantsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+  },
+  availablePlantsIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.md,
+  },
+  availablePlantsInfo: {
+    flex: 1,
+  },
   card: {
     borderRadius: BorderRadius.lg,
     overflow: "hidden",

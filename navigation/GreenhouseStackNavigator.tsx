@@ -5,6 +5,7 @@ import SectorListScreen from "@/screens/SectorListScreen";
 import BenchDetailScreen from "@/screens/BenchDetailScreen";
 import RecordActivityScreen from "@/screens/RecordActivityScreen";
 import EditBenchScreen from "@/screens/EditBenchScreen";
+import AvailablePlantsScreen from "@/screens/AvailablePlantsScreen";
 import { useTheme } from "@/hooks/useTheme";
 import { getCommonScreenOptions } from "@/navigation/screenOptions";
 
@@ -18,6 +19,7 @@ export type GreenhouseStackParamList = {
     bench?: string;
   };
   EditBench: { greenhouse: number; sector: number; bench: string };
+  AvailablePlants: undefined;
 };
 
 const Stack = createNativeStackNavigator<GreenhouseStackParamList>();
@@ -66,6 +68,13 @@ export default function GreenhouseStackNavigator() {
         options={{
           headerTitle: "Modifica Bancale",
           presentation: "modal",
+        }}
+      />
+      <Stack.Screen
+        name="AvailablePlants"
+        component={AvailablePlantsScreen}
+        options={{
+          headerTitle: "Piante Disponibili",
         }}
       />
     </Stack.Navigator>

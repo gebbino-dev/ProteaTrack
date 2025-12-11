@@ -1,0 +1,50 @@
+:
+
+> Nella mia app ho già importato tutte le fatture e ho le righe divise per tipologia, in particolare le **piante**.  
+> Quello che voglio adesso è questo flusso molto semplice:
+> 
+> 1. **Nuova area di lavoro “Piante disponibili”**  
+>    - Crea una nuova pagina / schermata chiamata tipo “Piante disponibili” (o “Magazzino piante”).  
+>    - Questa pagina deve:
+>      - Leggere tutte le righe di fattura che riguardano **piante** (usa il campo che abbiamo già per la tipologia “piante”).  
+>      - Unire e raggruppare questi dati in modo automatico per **genere** di pianta e poi per **varietà**.
+> 
+> 2. **Regole di raggruppamento**  
+>    - Per ogni riga di pianta voglio ottenere almeno questi campi:
+>      - Genere (es. “Protea”, “Leucospermum”, “Serruria”, “Telopea”).  
+>      - Varietà (es. “Protea Pink Ice”, “Leucospermum Tango”, ecc.).  
+>      - Numero totale piante di quella varietà (somma di tutte le fatture).  
+>    - Il risultato sulla schermata deve essere:
+>      - Un elenco raggruppato così:
+>        - Genere → sotto le righe delle singole varietà con la quantità totale piante.  
+>      - Esempio visivo:
+>        - Protea  
+>          - Pink Ice – 1.200 piante  
+>          - Susara – 800 piante  
+>        - Leucospermum  
+>          - Tango – 600 piante  
+>          - High Gold – 400 piante  
+>    - Se nei dati non esiste ancora un campo “genere”, ricavalo dal nome/descrizione della pianta usando una semplice regola (ad esempio controllando se nel nome compare “Protea”, “Leucospermum”, “Serruria”, “Telopea”) e salva questo campo in modo che sia usabile per i filtri.
+> 
+> 3. **Preparare la distribuzione nei settori**  
+>    - Dalla stessa schermata “Piante disponibili” voglio poter **“lavorare” le piante** e distribuirle nei settori della serra.  
+>    - Per ogni riga (una varietà) devo poter:
+>      - Selezionare la varietà.  
+>      - Scegliere il **settore** (useremo i settori che esistono già nella mia app: Serra X – Settore Y).  
+>      - Indicare quante piante mandare in quel settore.  
+>    - Dopo aver fatto questa azione:
+>      - Le piante disponibili per quella varietà devono diminuire della quantità assegnata.  
+>      - Deve essere registrato da qualche parte quante piante di quella varietà ci sono in ogni settore (mi basta anche solo un conteggio per ora).
+> 
+> 4. **Semplificazione per me (non tecnico)**  
+>    - Non voglio dover capire la struttura tecnica: mi basta che tu:
+>      - Recuperi le righe di fattura di tipo “piante”.  
+>      - Le raggruppi automaticamente per **genere** e **varietà** con la somma delle quantità.  
+>      - Crei una vista/pagina dove posso vedere questo elenco e, da lì, spostare piante nei vari settori indicando solo: settore e quantità.  
+>    - Se ti servono nuovi campi (es. `genere`, `varietà`, `quantitàTotale`, `quantitàDisponibile`), aggiungili tu nei documenti collegati alle righe di fattura o crea una nuova collezione “plantLots”, purché il risultato finale per me sia:  
+>      - Vedo lista per Genere → Varietà → Quantità.  
+>      - Posso distribuire queste quantità ai settori della serra.
+> 
+> 5. **Attenzione importante**  
+>    - Non cambiare la logica di importazione fatture che abbiamo appena sistemato (costi/ricavi e conferimento fiori).  
+>    - Lavora “sopra” questi dati: usa ciò che già esiste per costruire la nuova area “Piante disponibili” e la funzione di distribuzione per settore e bancale 
