@@ -12,7 +12,6 @@ import { Card } from "@/components/Card";
 import Spacer from "@/components/Spacer";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { storage } from "@/utils/storage";
 import { 
   parseInvoiceXml, 
   extractInventoryItems, 
@@ -21,7 +20,8 @@ import {
   formatCurrency,
   InventoryImportItem 
 } from "@/utils/xmlImportService";
-import { Transaction, PlantRecord, DEFAULT_EXPENSE_CATEGORIES, DEFAULT_REVENUE_CATEGORIES } from "@/types";
+import { inventoryStore } from "@/utils/inventoryStore";
+import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_REVENUE_CATEGORIES } from "@/types";
 import { AccountingStackParamList } from "@/navigation/AccountingStackNavigator";
 
 type InvoiceImportScreenProps = {
@@ -89,48 +89,36 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
     }
   };
 
-  const handleImport = async () => {
+  const handleConfirmImport = async () => {
     if (!parsedInvoice) return;
 
     try {
       setLoading(true);
 
-      const transactionData = {
-        type: parsedInvoice.transaction.type,
-        categoryId: selectedCategory,
-        amount: parsedInvoice.transaction.amount,
-        date: parsedInvoice.transaction.date,
-        counterparty: parsedInvoice.transaction.counterparty,
-        description: parsedInvoice.transaction.description,
-        docRef: parsedInvoice.transaction.docRef,
-        docType: parsedInvoice.transaction.docType,
-        vatRate: parsedInvoice.transaction.vatRate,
-        notes: parsedInvoice.transaction.notes,
-        source: 'import' as const,
-      };
+      const result = await inventoryStore.processInvoiceImport(
+        parsedInvoice,
+        inventoryItems,
+        selectedCategory
+      );
 
-      await storage.saveTransaction(transactionData);
+      const messageParts = [
+        `Fattura ${parsedInvoice.documentNumber} importata con successo.`,
+        `Importo: ${formatCurrency(parsedInvoice.totalAmount)}`,
+      ];
 
-      const plantItems = inventoryItems.filter(item => item.type === "plant" && item.plantRecord);
-      for (const item of plantItems) {
-        if (item.plantRecord) {
-          const plantRecordData = {
-            variety: item.plantRecord.variety || "N/D",
-            species: item.plantRecord.species,
-            quantity: item.quantity,
-            arrivalDate: item.plantRecord.arrivalDate || new Date().toISOString().split("T")[0],
-            sourceDocument: item.sourceDocument,
-            notes: item.plantRecord.notes || "",
-          };
-          await storage.savePlantRecord(plantRecordData);
-        }
+      if (result.plantsAdded > 0) {
+        messageParts.push(`Piante registrate: ${result.plantsAdded} lotti`);
+      }
+      if (result.materialsAdded > 0) {
+        messageParts.push(`Materiali registrati: ${result.materialsAdded}`);
+      }
+      if (result.productsAdded > 0) {
+        messageParts.push(`Prodotti fitosanitari: ${result.productsAdded}`);
       }
 
       Alert.alert(
         "Importazione completata",
-        `Fattura ${parsedInvoice.documentNumber} importata con successo.\n` +
-        `Importo: ${formatCurrency(parsedInvoice.totalAmount)}\n` +
-        (plantItems.length > 0 ? `Piante registrate: ${plantItems.length} lotti` : ""),
+        messageParts.join("\n"),
         [{ text: "OK", onPress: () => navigation.goBack() }]
       );
     } catch (error) {
@@ -359,7 +347,7 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
             
             <Pressable
               style={[styles.primaryButton, { backgroundColor: theme.primary, opacity: loading ? 0.6 : 1 }]}
-              onPress={handleImport}
+              onPress={handleConfirmImport}
               disabled={loading}
             >
               <Feather name="check" size={20} color="#FFFFFF" style={{ marginRight: Spacing.sm }} />
