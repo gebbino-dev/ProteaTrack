@@ -1,0 +1,69 @@
+
+Sto sviluppando ProteaTrack.  
+Ho già `xmlImportService.ts` con `parseInvoiceXml` ed `extractInventoryItems`, e la schermata `screens/InvoiceImportScreen.tsx` che mostra le righe della fattura e chiama `inventoryStore.processInvoiceImport(parsedInvoice, inventoryItems, selectedCategory)` quando premo “Conferma Importazione”.  
+Ho anche `utils/inventoryStore.ts` come ti ho incollato prima.  
+
+Adesso voglio migliorare l’import così:
+
+1. **Controllo riga per riga prima del salvataggio**
+   - Ogni riga della fattura deve poter essere:
+     - inclusa o esclusa dall’import (checkbox o toggle “Importa sì/no”).  
+     - classificata manualmente dall’utente come destinazione d’uso:  
+       `piante`, `vasi`, `terriccio`, `fitofarmaco`, `fertilizzante`, `materiale`, `altro`.  
+   - Non voglio che la sola funzione `detectItemType` decida tutto: deve solo dare un valore iniziale che io posso cambiare.
+
+2. **Evitare righe doppie o inutili**
+   - Devo poter deselezionare/cancellare dall’import righe che non mi interessano (es. spese accessorie, contributi, ecc.).  
+   - Se deseleziono una riga, non deve essere salvata né come pianta, né come materiale, né come prodotto fitosanitario.
+
+3. **Modifiche richieste ai file esistenti**
+
+### A) Aggiorna `InventoryImportItem` in `xmlImportService.ts`
+
+- Aggiungi questi campi:
+  ```ts
+  selected?: boolean;  // default true
+  itemType?: 'piante' | 'vasi' | 'terriccio' | 'fitofarmaco' | 'fertilizzante' | 'materiale' | 'altro';
+  ```
+- Quando costruisci gli `InventoryImportItem` in `extractInventoryItems`, imposta:
+  - `selected = true` di default.  
+  - `itemType` usando il risultato attuale di `detectItemType(description)` (può rimanere come “suggerimento iniziale”).
+
+### B) Aggiorna `InvoiceImportScreen.tsx`
+
+Nel componente `InvoiceImportScreen`:
+
+1. Per ogni riga (`parsedInvoice.lineItems` / `inventoryItems`):
+   - mostra:
+     - un toggle / switch / checkbox “Importa” che modifica `item.selected` nell’array `inventoryItems`.  
+     - un picker / menu per la destinazione d’uso che permette di scegliere tra:  
+       `piante`, `vasi`, `terriccio`, `fitofarmaco`, `fertilizzante`, `materiale`, `altro`,  
+       aggiornando `item.itemType` e, se serve, `item.type` e `item.materialType` in `inventoryItems`.
+   - Usa il valore suggerito da `item.itemType` come selezione iniziale nel picker.
+
+2. Aggiungi un pulsante “Rimuovi riga” o una icona cestino per permettermi di marcare una riga come non importabile:
+   - questo può semplicemente impostare `selected = false` per quella riga oppure rimuoverla dall’array `inventoryItems`.
+
+3. Assicurati che `handleConfirmImport` passi l’array `inventoryItems` aggiornato (con i campi `selected` e la destinazione d’uso scelta) a `inventoryStore.processInvoiceImport`.
+
+### C) Aggiorna `inventoryStore.processInvoiceImport` in `inventoryStore.ts`
+
+Dentro `processInvoiceImport`:
+
+1. Prima del ciclo, filtra gli item:
+   - ignora tutti quelli con `selected === false` oppure rimossi.  
+   ```ts
+   for (const item of inventoryItems) {
+     if (item.selected === false) continue;
+     // resto della logica...
+   }
+   ```
+
+2. Usa la destinazione d’uso scelta dall’utente:
+   - se `item.itemType === 'piante'` → assicurati che `item.type` sia `'plant'` e chiama `addPlantRecord(item)`.  
+   - se `item.itemType === 'fitofarmaco'` o `'fertilizzante'` → assicurati che `item.type` sia `'material'` e `item.materialType` sia rispettivamente `'fitofarmaco'` o `'fertilizzante'`, poi chiama `addPhytosanitaryProductFromInvoice(item)`.  
+   - se `item.itemType === 'vasi' | 'terriccio' | 'materiale' | 'altro'` → `item.type = 'material'` e `item.materialType` coerente, poi chiama `addMaterialFromInvoice(item)`.
+
+3. Mantieni la logica esistente di salvataggio della `Transaction` (`addTransaction`) e l’oggetto `result` (`plantsAdded`, `materialsAdded`, `productsAdded`), aggiornando i contatori solo per gli item effettivamente importati.
+
+Non modificare la logica di base del parsing XML (estrazione di dati da `DatiGeneraliDocumento`, `DettaglioLinee`, `DatiRiepilogo`), lavora solo sull’arricchimento di `InventoryImportItem`, sulla schermata `InvoiceImportScreen` e sulla funzione `processInvoiceImport`.

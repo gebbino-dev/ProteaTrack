@@ -159,18 +159,24 @@ export const inventoryStore = {
       result.transactionSaved = true;
 
       for (const item of inventoryItems) {
-        if (item.type === 'plant') {
-          const plantRecord = await this.addPlantRecord(item);
+        if (!item.selected) {
+          continue;
+        }
+
+        const normalizedItem = this.normalizeItemForSave(item);
+
+        if (normalizedItem.itemType === 'piante') {
+          const plantRecord = await this.addPlantRecord(normalizedItem);
           if (plantRecord) {
             result.plantsAdded++;
           }
-        } else if (item.materialType === 'fitofarmaco' || item.materialType === 'fertilizzante') {
-          const product = await this.addPhytosanitaryProductFromInvoice(item);
+        } else if (normalizedItem.itemType === 'fitofarmaco' || normalizedItem.itemType === 'fertilizzante') {
+          const product = await this.addPhytosanitaryProductFromInvoice(normalizedItem);
           if (product) {
             result.productsAdded++;
           }
-        } else if (['vasi', 'terriccio', 'materiale', 'altro'].includes(item.materialType || '')) {
-          const material = await this.addMaterialFromInvoice(item);
+        } else if (['vasi', 'terriccio', 'materiale', 'altro'].includes(normalizedItem.itemType)) {
+          const material = await this.addMaterialFromInvoice(normalizedItem);
           if (material) {
             result.materialsAdded++;
           }
@@ -182,5 +188,27 @@ export const inventoryStore = {
       console.error('Error processing invoice import:', error);
       throw error;
     }
+  },
+
+  normalizeItemForSave(item: InventoryImportItem): InventoryImportItem {
+    const normalized = { ...item };
+    
+    if (item.itemType === 'piante') {
+      normalized.type = 'plant';
+      if (!normalized.plantRecord) {
+        normalized.plantRecord = {
+          variety: item.description.substring(0, 50),
+          quantity: item.quantity,
+          arrivalDate: new Date().toISOString().split('T')[0],
+          sourceDocument: item.sourceDocument,
+          notes: `Prezzo: ${item.unitPrice.toFixed(2)} EUR/pz`,
+        };
+      }
+    } else {
+      normalized.type = 'material';
+      normalized.materialType = item.itemType;
+    }
+    
+    return normalized;
   },
 };

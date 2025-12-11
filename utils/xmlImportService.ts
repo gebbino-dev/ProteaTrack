@@ -45,6 +45,8 @@ export interface ParsedInvoice {
   causale?: string;
 }
 
+export type ItemTypeOption = 'piante' | 'vasi' | 'terriccio' | 'fitofarmaco' | 'fertilizzante' | 'materiale' | 'altro';
+
 export interface InventoryImportItem {
   type: 'plant' | 'material';
   plantRecord?: Partial<PlantRecord>;
@@ -54,6 +56,9 @@ export interface InventoryImportItem {
   description: string;
   unitPrice: number;
   sourceDocument: string;
+  selected: boolean;
+  itemType: ItemTypeOption;
+  lineNumber: number;
 }
 
 function getTextContent(xml: string, tagName: string): string | null {
@@ -300,7 +305,8 @@ export function extractInventoryItems(
   return parsedInvoice.lineItems
     .filter(item => item.quantity > 0)
     .map(item => {
-      const isPlant = item.itemType === 'piante';
+      const detectedType = item.itemType || 'altro';
+      const isPlant = detectedType === 'piante';
       
       const inventoryItem: InventoryImportItem = {
         type: isPlant ? 'plant' : 'material',
@@ -309,6 +315,9 @@ export function extractInventoryItems(
         description: item.description,
         unitPrice: item.unitPrice,
         sourceDocument,
+        selected: true,
+        itemType: detectedType,
+        lineNumber: item.lineNumber,
       };
       
       if (isPlant) {
@@ -321,7 +330,7 @@ export function extractInventoryItems(
           notes: `Prezzo: ${item.unitPrice.toFixed(2)} EUR/pz`,
         };
       } else {
-        inventoryItem.materialType = item.itemType || 'altro';
+        inventoryItem.materialType = detectedType;
       }
       
       return inventoryItem;

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Alert, Platform, ScrollView, Pressable } from "react-native";
+import { View, StyleSheet, Alert, Platform, ScrollView, Pressable, Switch } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
@@ -18,11 +18,22 @@ import {
   ParsedInvoice,
   getDocumentTypeDescription,
   formatCurrency,
-  InventoryImportItem 
+  InventoryImportItem,
+  ItemTypeOption
 } from "@/utils/xmlImportService";
 import { inventoryStore } from "@/utils/inventoryStore";
 import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_REVENUE_CATEGORIES } from "@/types";
 import { AccountingStackParamList } from "@/navigation/AccountingStackNavigator";
+
+const ITEM_TYPE_OPTIONS: { value: ItemTypeOption; label: string; icon: string }[] = [
+  { value: 'piante', label: 'Piante', icon: 'sun' },
+  { value: 'vasi', label: 'Vasi', icon: 'package' },
+  { value: 'terriccio', label: 'Terriccio', icon: 'layers' },
+  { value: 'fitofarmaco', label: 'Fitofarmaco', icon: 'shield' },
+  { value: 'fertilizzante', label: 'Fertilizzante', icon: 'droplet' },
+  { value: 'materiale', label: 'Materiale', icon: 'tool' },
+  { value: 'altro', label: 'Altro', icon: 'box' },
+];
 
 type InvoiceImportScreenProps = {
   navigation: NativeStackNavigationProp<AccountingStackParamList, "InvoiceImport">;
@@ -129,6 +140,33 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
     }
   };
 
+  const [showTypePicker, setShowTypePicker] = useState<number | null>(null);
+
+  const toggleItemSelected = (lineNumber: number) => {
+    setInventoryItems(prev => 
+      prev.map(item => 
+        item.lineNumber === lineNumber 
+          ? { ...item, selected: !item.selected }
+          : item
+      )
+    );
+  };
+
+  const changeItemType = (lineNumber: number, newType: ItemTypeOption) => {
+    setInventoryItems(prev => 
+      prev.map(item => 
+        item.lineNumber === lineNumber 
+          ? { ...item, itemType: newType }
+          : item
+      )
+    );
+    setShowTypePicker(null);
+  };
+
+  const getSelectedCount = () => {
+    return inventoryItems.filter(item => item.selected).length;
+  };
+
   const getItemTypeIcon = (itemType: string): string => {
     switch (itemType) {
       case "piante": return "sun";
@@ -136,6 +174,7 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
       case "terriccio": return "layers";
       case "fitofarmaco": return "shield";
       case "fertilizzante": return "droplet";
+      case "materiale": return "tool";
       default: return "box";
     }
   };
@@ -147,8 +186,14 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
       case "terriccio": return theme.activityOther;
       case "fitofarmaco": return theme.activityTreatment;
       case "fertilizzante": return theme.activityWatering;
+      case "materiale": return "#795548";
       default: return theme.textSecondary;
     }
+  };
+
+  const getItemTypeLabel = (itemType: string): string => {
+    const option = ITEM_TYPE_OPTIONS.find(o => o.value === itemType);
+    return option ? option.label : 'Altro';
   };
 
   const categories = parsedInvoice?.transaction.type === "costo" 
@@ -254,23 +299,24 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
 
             <Spacer height={Spacing.xl} />
             
-            <ThemedText type="h3">Righe Fattura ({parsedInvoice.lineItems.length})</ThemedText>
+            <View style={styles.sectionHeader}>
+              <ThemedText type="h3">Righe Fattura ({inventoryItems.length})</ThemedText>
+              <ThemedText style={{ color: theme.textSecondary, fontSize: 13 }}>
+                {getSelectedCount()} da importare
+              </ThemedText>
+            </View>
             <Spacer height={Spacing.md} />
             
-            {parsedInvoice.lineItems.map((item, index) => (
-              <View key={index}>
-                <Card>
-                  <View style={styles.lineItemHeader}>
-                    <View style={[
-                      styles.itemTypeIcon,
-                      { backgroundColor: getItemTypeColor(item.itemType || "altro") + "20" }
-                    ]}>
-                      <Feather 
-                        name={getItemTypeIcon(item.itemType || "altro") as any} 
-                        size={16} 
-                        color={getItemTypeColor(item.itemType || "altro")} 
-                      />
-                    </View>
+            {inventoryItems.map((item, index) => (
+              <View key={item.lineNumber}>
+                <Card style={{ opacity: item.selected ? 1 : 0.5 }}>
+                  <View style={styles.lineItemRow}>
+                    <Switch
+                      value={item.selected}
+                      onValueChange={() => toggleItemSelected(item.lineNumber)}
+                      trackColor={{ false: theme.backgroundSecondary, true: theme.primary + "60" }}
+                      thumbColor={item.selected ? theme.primary : theme.textSecondary}
+                    />
                     <View style={styles.lineItemContent}>
                       <ThemedText numberOfLines={2} style={{ fontWeight: "500" }}>
                         {item.description}
@@ -280,9 +326,76 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
                           {item.quantity} {item.unitOfMeasure || "pz"} x {formatCurrency(item.unitPrice)}
                         </ThemedText>
                         <ThemedText style={{ fontWeight: "600" }}>
-                          {formatCurrency(item.totalPrice)}
+                          {formatCurrency(item.quantity * item.unitPrice)}
                         </ThemedText>
                       </View>
+                      
+                      <Spacer height={Spacing.sm} />
+                      
+                      <View style={styles.typePickerRow}>
+                        <ThemedText style={{ fontSize: 13, color: theme.textSecondary }}>
+                          Destinazione:
+                        </ThemedText>
+                        <Pressable 
+                          style={[
+                            styles.typePickerButton, 
+                            { 
+                              backgroundColor: getItemTypeColor(item.itemType) + "20",
+                              borderColor: getItemTypeColor(item.itemType),
+                            }
+                          ]}
+                          onPress={() => setShowTypePicker(showTypePicker === item.lineNumber ? null : item.lineNumber)}
+                          disabled={!item.selected}
+                        >
+                          <Feather 
+                            name={getItemTypeIcon(item.itemType) as any} 
+                            size={14} 
+                            color={getItemTypeColor(item.itemType)} 
+                          />
+                          <ThemedText style={{ 
+                            fontSize: 13, 
+                            marginLeft: Spacing.xs,
+                            color: getItemTypeColor(item.itemType),
+                            fontWeight: "500",
+                          }}>
+                            {getItemTypeLabel(item.itemType)}
+                          </ThemedText>
+                          <Feather 
+                            name={showTypePicker === item.lineNumber ? "chevron-up" : "chevron-down"} 
+                            size={14} 
+                            color={getItemTypeColor(item.itemType)} 
+                            style={{ marginLeft: Spacing.xs }}
+                          />
+                        </Pressable>
+                      </View>
+                      
+                      {showTypePicker === item.lineNumber ? (
+                        <View style={[styles.typeOptions, { backgroundColor: theme.backgroundSecondary }]}>
+                          {ITEM_TYPE_OPTIONS.map(option => (
+                            <Pressable
+                              key={option.value}
+                              style={[
+                                styles.typeOption,
+                                item.itemType === option.value && { backgroundColor: theme.primary + "20" }
+                              ]}
+                              onPress={() => changeItemType(item.lineNumber, option.value)}
+                            >
+                              <Feather 
+                                name={option.icon as any} 
+                                size={16} 
+                                color={item.itemType === option.value ? theme.primary : theme.text} 
+                              />
+                              <ThemedText style={{ 
+                                marginLeft: Spacing.sm,
+                                fontWeight: item.itemType === option.value ? "600" : "400",
+                                color: item.itemType === option.value ? theme.primary : theme.text,
+                              }}>
+                                {option.label}
+                              </ThemedText>
+                            </Pressable>
+                          ))}
+                        </View>
+                      ) : null}
                     </View>
                   </View>
                 </Card>
@@ -473,5 +586,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.sm,
     marginRight: Spacing.sm,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  lineItemRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  typePickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  typePickerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+  },
+  typeOptions: {
+    marginTop: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    overflow: "hidden",
+  },
+  typeOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
   },
 });
