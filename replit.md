@@ -19,13 +19,18 @@ L'app è organizzata in 6 moduli principali accessibili tramite bottom tab navig
 - Inventario piante con scansione DDT (OCR solo web)
 - Usa tipi: `Greenhouse`, `Sector`, `Bench`, `PlantRecord`, `GreenhouseConfig`
 
-### 3. Magazzino (Gestione Materiali da Fatture)
-- Visualizzazione righe fattura importate con assegnazione automatica
-- Modifica manuale categoria per ogni riga (piante, vasi, terriccio, fitofarmaci, fertilizzanti, materiali, semi, utenze, altro)
-- Conferma/elimina righe singole
-- Filtro per categoria
-- Collegamento con import fatture XML dalla sezione Contabilità
-- Usa tipi: `PendingInvoiceLine`, `ItemCategory`
+### 3. Magazzino (Inventario Confermato)
+- **2 Tab principali**:
+  - **Piante/Semi**: Raggruppate per genere (Protea, Leucospermum, Leucadendron, Banksia, etc.)
+    - Collegato con "Piante Disponibili" in Colture (stessa fonte dati: PlantInventory)
+    - Mostra: quantità totale, distribuite, disponibili per varietà
+    - Solo articoli da categoria "Acquisto Piante" o "Semi"
+  - **Materiali**: Vasi, terriccio, materiale vario, altro
+    - Filtri per tipo (Tutti, Vasi, Terriccio, Materiali, Altro)
+    - **Tendina per cambiare categoria**: premendo su un materiale si apre modale per riassegnare tipo
+    - Solo articoli da categoria "Materiali" in contabilità
+- Banner righe in attesa (espandibile) per confermare nuove importazioni
+- Usa tipi: `PendingInvoiceLine`, `ItemCategory`, `MaterialRecord`, `PlantLot`, `GenusGroup`
 
 ### 4. Quaderno (Quaderno di Campagna)
 - Registro trattamenti fitosanitari per compliance normativa

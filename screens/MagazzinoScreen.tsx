@@ -4,7 +4,6 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
 import { ScreenScrollView } from "@/components/ScreenScrollView";
 import { ThemedText } from "@/components/ThemedText";
@@ -20,7 +19,7 @@ import {
 } from "@/utils/pendingInvoiceStore";
 import { inventoryStore, MaterialRecord } from "@/utils/inventoryStore";
 import { storage } from "@/utils/storage";
-import { plantWarehouse, GenusGroup, PlantLot } from "@/utils/plantWarehouse";
+import { plantWarehouse, GenusGroup } from "@/utils/plantWarehouse";
 import { LavoroStackParamList } from "@/navigation/LavoroStackNavigator";
 
 type MagazzinoScreenProps = {
@@ -28,8 +27,7 @@ type MagazzinoScreenProps = {
 };
 
 type InventoryTab = 'piante' | 'materiali';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+type MaterialType = 'vasi' | 'terriccio' | 'materiale' | 'altro';
 
 const GENUS_COLORS: Record<string, string> = {
   'Protea': '#E91E63',
@@ -42,21 +40,18 @@ const GENUS_COLORS: Record<string, string> = {
   'Altro': '#607D8B',
 };
 
-interface MaterialItem {
-  id: string;
-  name: string;
-  type: string;
-  quantity: number;
-  unitOfMeasure: string;
-  date: string;
-  notes?: string;
-}
+const MATERIAL_TYPE_CONFIG: Record<MaterialType, { label: string; color: string; icon: string }> = {
+  'vasi': { label: 'Vasi', color: '#FF9800', icon: 'box' },
+  'terriccio': { label: 'Terriccio', color: '#795548', icon: 'layers' },
+  'materiale': { label: 'Materiale', color: '#607D8B', icon: 'tool' },
+  'altro': { label: 'Altro', color: '#9E9E9E', icon: 'more-horizontal' },
+};
 
 export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
   const { theme } = useTheme();
   const tabBarHeight = useBottomTabBarHeight();
   const [genusGroups, setGenusGroups] = useState<GenusGroup[]>([]);
-  const [materials, setMaterials] = useState<MaterialItem[]>([]);
+  const [materials, setMaterials] = useState<MaterialRecord[]>([]);
   const [pendingLines, setPendingLines] = useState<PendingInvoiceLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -65,7 +60,10 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
   const [selectedLine, setSelectedLine] = useState<PendingInvoiceLine | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [showPending, setShowPending] = useState(false);
-  const [materialFilter, setMaterialFilter] = useState<string | null>(null);
+  const [materialFilter, setMaterialFilter] = useState<MaterialType | null>(null);
+  
+  const [selectedMaterial, setSelectedMaterial] = useState<MaterialRecord | null>(null);
+  const [materialModalVisible, setMaterialModalVisible] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -76,17 +74,7 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
       ]);
 
       setGenusGroups(groups);
-      
-      const materialItems: MaterialItem[] = mats.map((mat: MaterialRecord) => ({
-        id: mat.id,
-        name: mat.name,
-        type: mat.type,
-        quantity: mat.quantity,
-        unitOfMeasure: mat.unitOfMeasure,
-        date: mat.arrivalDate,
-        notes: mat.notes,
-      }));
-      setMaterials(materialItems);
+      setMaterials(mats);
       setPendingLines(pending);
 
       if (groups.length > 0 && expandedGenus.size === 0) {
@@ -138,6 +126,19 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
     }
   };
 
+  const handleChangeMaterialType = async (newType: MaterialType) => {
+    if (!selectedMaterial) return;
+    
+    try {
+      await inventoryStore.updateMaterial(selectedMaterial.id, { type: newType });
+      setMaterialModalVisible(false);
+      setSelectedMaterial(null);
+      loadData();
+    } catch (error) {
+      console.error("Error updating material type:", error);
+    }
+  };
+
   const processLineToInventory = async (line: PendingInvoiceLine): Promise<boolean> => {
     const category = line.assignedCategory;
     const sourceDoc = `${line.invoiceNumber} del ${line.invoiceDate}`;
@@ -172,7 +173,7 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
       } else if (['vasi', 'terriccio', 'materiale', 'altro'].includes(category)) {
         await inventoryStore.saveMaterial({
           name: line.description,
-          type: category as 'vasi' | 'terriccio' | 'materiale' | 'altro',
+          type: category as MaterialType,
           quantity: line.quantity,
           unitOfMeasure: line.unitOfMeasure || 'pz',
           unitPrice: line.unitPrice,
@@ -256,37 +257,43 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
     }
   };
 
+  const handleDeleteMaterial = async (material: MaterialRecord) => {
+    const deleteAction = async () => {
+      try {
+        await inventoryStore.deleteMaterial(material.id);
+        loadData();
+      } catch (error) {
+        console.error("Error deleting material:", error);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm(`Eliminare "${material.name}"?`)) {
+        deleteAction();
+      }
+    } else {
+      Alert.alert(
+        "Elimina Materiale",
+        `Eliminare "${material.name}"?`,
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: "Elimina", style: "destructive", onPress: deleteAction },
+        ]
+      );
+    }
+  };
+
   const totalPlants = genusGroups.reduce((sum, g) => sum + g.totalPlants, 0);
   const totalMaterials = materials.length;
 
-  const materialTypes = ['vasi', 'terriccio', 'materiale', 'altro'];
-  const getMaterialCount = (type: string) => materials.filter(m => m.type === type).length;
+  const materialTypes: MaterialType[] = ['vasi', 'terriccio', 'materiale', 'altro'];
+  const getMaterialCount = (type: MaterialType) => materials.filter(m => m.type === type).length;
   
   const filteredMaterials = materialFilter 
     ? materials.filter(m => m.type === materialFilter)
     : materials;
 
   const categories = Object.keys(CATEGORY_CONFIG) as ItemCategory[];
-
-  const getMaterialTypeLabel = (type: string): string => {
-    const labels: Record<string, string> = {
-      'vasi': 'Vasi',
-      'terriccio': 'Terriccio',
-      'materiale': 'Materiali',
-      'altro': 'Altro',
-    };
-    return labels[type] || type;
-  };
-
-  const getMaterialTypeColor = (type: string): string => {
-    const colors: Record<string, string> = {
-      'vasi': '#FF9800',
-      'terriccio': '#795548',
-      'materiale': '#607D8B',
-      'altro': '#9E9E9E',
-    };
-    return colors[type] || theme.primary;
-  };
 
   return (
     <ThemedView style={styles.container}>
@@ -426,6 +433,9 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
             <ThemedText type="h4" style={styles.sectionTitle}>
               Piante e Semi per Genere
             </ThemedText>
+            <ThemedText style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+              Da categoria "Acquisto Piante"
+            </ThemedText>
             <Spacer height={Spacing.md} />
 
             {genusGroups.length === 0 ? (
@@ -440,7 +450,7 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
                   Nessuna pianta in magazzino
                 </ThemedText>
                 <ThemedText style={[styles.emptySubtext, { color: theme.textSecondary }]}>
-                  Importa fatture XML dalla sezione Contabilita
+                  Importa fatture con categoria "Acquisto Piante"
                 </ThemedText>
               </View>
             ) : (
@@ -515,6 +525,9 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
             <ThemedText type="h4" style={styles.sectionTitle}>
               Materiali per Tipo
             </ThemedText>
+            <ThemedText style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+              Premi su un materiale per cambiare categoria
+            </ThemedText>
             <Spacer height={Spacing.sm} />
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -532,8 +545,7 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
                 </Pressable>
                 {materialTypes.map((type) => {
                   const count = getMaterialCount(type);
-                  if (count === 0) return null;
-                  const color = getMaterialTypeColor(type);
+                  const config = MATERIAL_TYPE_CONFIG[type];
                   const isActive = materialFilter === type;
                   
                   return (
@@ -542,11 +554,11 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
                       onPress={() => setMaterialFilter(isActive ? null : type)}
                       style={[
                         styles.filterChip,
-                        { backgroundColor: isActive ? color : theme.backgroundDefault }
+                        { backgroundColor: isActive ? config.color : theme.backgroundDefault }
                       ]}
                     >
                       <ThemedText style={{ color: isActive ? '#FFFFFF' : theme.text, fontSize: 13 }}>
-                        {getMaterialTypeLabel(type)} ({count})
+                        {config.label} ({count})
                       </ThemedText>
                     </Pressable>
                   );
@@ -568,28 +580,41 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
                   Nessun materiale in magazzino
                 </ThemedText>
                 <ThemedText style={[styles.emptySubtext, { color: theme.textSecondary }]}>
-                  Importa fatture XML dalla sezione Contabilita
+                  Importa fatture con categoria "Materiali"
                 </ThemedText>
               </View>
             ) : (
               filteredMaterials.map((item) => {
-                const color = getMaterialTypeColor(item.type);
+                const config = MATERIAL_TYPE_CONFIG[item.type];
                 
                 return (
-                  <View
+                  <Pressable
                     key={item.id}
                     style={[styles.materialCard, { backgroundColor: theme.backgroundDefault }]}
+                    onPress={() => {
+                      setSelectedMaterial(item);
+                      setMaterialModalVisible(true);
+                    }}
                   >
                     <View style={styles.materialHeader}>
-                      <View style={[styles.categoryBadge, { backgroundColor: color + '20' }]}>
-                        <Feather name="box" size={14} color={color} />
-                        <ThemedText style={[styles.categoryText, { color }]}>
-                          {getMaterialTypeLabel(item.type)}
+                      <View style={[styles.categoryBadge, { backgroundColor: config.color + '20' }]}>
+                        <Feather name={config.icon as any} size={14} color={config.color} />
+                        <ThemedText style={[styles.categoryText, { color: config.color }]}>
+                          {config.label}
                         </ThemedText>
                       </View>
-                      <ThemedText style={[styles.materialDate, { color: theme.textSecondary }]}>
-                        {item.date}
-                      </ThemedText>
+                      <View style={styles.materialActions}>
+                        <Pressable
+                          style={[styles.smallActionButton, { backgroundColor: theme.error + '15' }]}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleDeleteMaterial(item);
+                          }}
+                        >
+                          <Feather name="trash-2" size={14} color={theme.error} />
+                        </Pressable>
+                        <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+                      </View>
                     </View>
 
                     <Spacer height={Spacing.sm} />
@@ -602,6 +627,9 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
                       <ThemedText style={[styles.materialQuantity, { color: theme.primary }]}>
                         {item.quantity} {item.unitOfMeasure}
                       </ThemedText>
+                      <ThemedText style={[styles.materialDate, { color: theme.textSecondary }]}>
+                        {item.arrivalDate}
+                      </ThemedText>
                     </View>
 
                     {item.notes ? (
@@ -609,7 +637,7 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
                         {item.notes}
                       </ThemedText>
                     ) : null}
-                  </View>
+                  </Pressable>
                 );
               })
             )}
@@ -674,6 +702,62 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={materialModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMaterialModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText type="h4">Cambia Categoria Materiale</ThemedText>
+              <Pressable onPress={() => setMaterialModalVisible(false)}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+
+            <Spacer height={Spacing.lg} />
+
+            {selectedMaterial ? (
+              <ThemedText style={[styles.selectedDescription, { color: theme.textSecondary }]} numberOfLines={2}>
+                {selectedMaterial.name}
+              </ThemedText>
+            ) : null}
+
+            <Spacer height={Spacing.lg} />
+
+            <View style={styles.categoryList}>
+              {materialTypes.map((type) => {
+                const config = MATERIAL_TYPE_CONFIG[type];
+                const isSelected = selectedMaterial?.type === type;
+                
+                return (
+                  <Pressable
+                    key={type}
+                    style={[
+                      styles.categoryOption,
+                      { backgroundColor: isSelected ? config.color + '20' : theme.backgroundSecondary },
+                    ]}
+                    onPress={() => handleChangeMaterialType(type)}
+                  >
+                    <View style={[styles.categoryIcon, { backgroundColor: config.color + '30' }]}>
+                      <Feather name={config.icon as any} size={20} color={config.color} />
+                    </View>
+                    <ThemedText style={styles.categoryLabel}>{config.label}</ThemedText>
+                    {isSelected ? (
+                      <Feather name="check-circle" size={20} color={config.color} />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Spacer height={Spacing.xl} />
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -707,6 +791,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginBottom: Spacing.xs,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
   },
   filterRow: {
     flexDirection: "row",
@@ -800,6 +887,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  materialActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  smallActionButton: {
+    padding: Spacing.xs,
+    borderRadius: BorderRadius.sm,
   },
   materialDate: {
     fontSize: 12,

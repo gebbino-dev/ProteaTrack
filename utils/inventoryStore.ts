@@ -65,6 +65,21 @@ export const inventoryStore = {
     }
   },
 
+  async updateMaterial(id: string, updates: Partial<Omit<MaterialRecord, 'id' | 'createdAt'>>): Promise<MaterialRecord | null> {
+    try {
+      const materials = await this.getMaterials();
+      const index = materials.findIndex(m => m.id === id);
+      if (index === -1) return null;
+      
+      materials[index] = { ...materials[index], ...updates };
+      await AsyncStorage.setItem(KEYS.MATERIALS, JSON.stringify({ materials }));
+      return materials[index];
+    } catch (error) {
+      console.error('Error updating material:', error);
+      throw error;
+    }
+  },
+
   async clearAllMaterials(): Promise<number> {
     try {
       const materials = await this.getMaterials();
