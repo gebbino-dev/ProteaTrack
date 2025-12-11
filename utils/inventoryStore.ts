@@ -54,6 +54,29 @@ export const inventoryStore = {
     }
   },
 
+  async deleteMaterial(id: string): Promise<void> {
+    try {
+      const materials = await this.getMaterials();
+      const filtered = materials.filter(m => m.id !== id);
+      await AsyncStorage.setItem(KEYS.MATERIALS, JSON.stringify({ materials: filtered }));
+    } catch (error) {
+      console.error('Error deleting material:', error);
+      throw error;
+    }
+  },
+
+  async clearAllMaterials(): Promise<number> {
+    try {
+      const materials = await this.getMaterials();
+      const count = materials.length;
+      await AsyncStorage.setItem(KEYS.MATERIALS, JSON.stringify({ materials: [] }));
+      return count;
+    } catch (error) {
+      console.error('Error clearing materials:', error);
+      throw error;
+    }
+  },
+
   async addPlantRecord(item: InventoryImportItem): Promise<PlantRecord | null> {
     if (item.type !== 'plant' || !item.plantRecord) {
       return null;
@@ -119,16 +142,40 @@ export const inventoryStore = {
     return await storage.saveProduct(productData);
   },
 
-  async addTransaction(parsedInvoice: ParsedInvoice, categoryId: string): Promise<boolean> {
+  async checkDuplicateInvoice(parsedInvoice: ParsedInvoice): Promise<{ isDuplicate: boolean; existingId?: string }> {
     const docRef = parsedInvoice.transaction.docRef || '';
     const counterparty = parsedInvoice.transaction.counterparty || '';
+    const date = parsedInvoice.transaction.date || '';
+    const amount = parsedInvoice.transaction.amount || 0;
     
-    if (docRef && counterparty) {
-      const existingTransaction = await storage.findTransactionByDocRef(docRef, counterparty);
-      if (existingTransaction) {
-        console.log('[inventoryStore] Transaction already exists:', existingTransaction.id);
-        return false;
+    if (!docRef && !counterparty) {
+      return { isDuplicate: false };
+    }
+
+    const transactions = await storage.getTransactions();
+    
+    const existing = transactions.find(t => {
+      if (t.docRef === docRef && t.counterparty === counterparty) {
+        return true;
       }
+      if (t.counterparty === counterparty && t.date === date && Math.abs(t.amount - amount) < 0.01) {
+        return true;
+      }
+      return false;
+    });
+
+    if (existing) {
+      return { isDuplicate: true, existingId: existing.id };
+    }
+    return { isDuplicate: false };
+  },
+
+  async addTransaction(parsedInvoice: ParsedInvoice, categoryId: string): Promise<{ success: boolean; isDuplicate: boolean; existingId?: string }> {
+    const duplicateCheck = await this.checkDuplicateInvoice(parsedInvoice);
+    
+    if (duplicateCheck.isDuplicate) {
+      console.log('[inventoryStore] Fattura già importata:', duplicateCheck.existingId);
+      return { success: false, isDuplicate: true, existingId: duplicateCheck.existingId };
     }
 
     const transactionData = {
@@ -146,7 +193,7 @@ export const inventoryStore = {
     };
 
     await storage.saveTransaction(transactionData);
-    return true;
+    return { success: true, isDuplicate: false };
   },
 
   async processInvoiceImport(
@@ -155,20 +202,23 @@ export const inventoryStore = {
     categoryId: string
   ): Promise<{
     transactionSaved: boolean;
+    isDuplicate: boolean;
     plantsAdded: number;
     materialsAdded: number;
     productsAdded: number;
   }> {
     const result = {
       transactionSaved: false,
+      isDuplicate: false,
       plantsAdded: 0,
       materialsAdded: 0,
       productsAdded: 0,
     };
 
     try {
-      const saved = await this.addTransaction(parsedInvoice, categoryId);
-      result.transactionSaved = saved;
+      const txResult = await this.addTransaction(parsedInvoice, categoryId);
+      result.transactionSaved = txResult.success;
+      result.isDuplicate = txResult.isDuplicate;
 
       for (const item of inventoryItems) {
         if (!item.selected) {

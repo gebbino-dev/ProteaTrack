@@ -233,11 +233,11 @@ export default function TransactionListScreen() {
   const renderItem = ({ item }: { item: Transaction }) => {
     const cat = getCategoryById(item.categoryId);
     return (
-      <Pressable
-        onPress={() => navigation.navigate('TransactionEdit', { transactionId: item.id })}
-        onLongPress={() => handleDelete(item.id)}
-      >
-        <Card style={styles.transactionCard}>
+      <Card style={styles.transactionCard}>
+        <Pressable
+          onPress={() => navigation.navigate('TransactionEdit', { transactionId: item.id })}
+          style={styles.transactionContent}
+        >
           <View style={[styles.transactionIcon, { backgroundColor: (cat?.color || '#999') + '20' }]}>
             <Feather name={cat?.icon as any || 'circle'} size={20} color={cat?.color || '#999'} />
           </View>
@@ -262,8 +262,17 @@ export default function TransactionListScreen() {
           ]}>
             {item.type === 'ricavo' ? '+' : '-'}{formatCurrency(item.amount)}
           </ThemedText>
-        </Card>
-      </Pressable>
+        </Pressable>
+        <Pressable
+          onPress={() => handleDelete(item.id)}
+          style={({ pressed }) => [
+            styles.deleteButton,
+            { backgroundColor: 'rgba(255,59,48,0.1)', opacity: pressed ? 0.7 : 1 }
+          ]}
+        >
+          <Feather name="trash-2" size={18} color={theme.error} />
+        </Pressable>
+      </Card>
     );
   };
 
@@ -363,8 +372,24 @@ const styles = StyleSheet.create({
   transactionCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 0,
+    overflow: 'hidden',
+  },
+  transactionContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: Spacing.md,
     gap: Spacing.md,
+  },
+  deleteButton: {
+    width: 44,
+    height: '100%',
+    minHeight: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(0,0,0,0.05)',
   },
   transactionIcon: {
     width: 44,

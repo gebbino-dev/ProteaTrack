@@ -165,6 +165,19 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
     try {
       setLoading(true);
 
+      const duplicateCheck = await inventoryStore.checkDuplicateInvoice(parsedInvoice);
+      
+      if (duplicateCheck.isDuplicate) {
+        const supplierName = parsedInvoice.supplier?.denomination || 'Fornitore';
+        Alert.alert(
+          "Fattura Duplicata",
+          `Questa fattura (${parsedInvoice.documentNumber}) risulta già importata nel sistema.\n\nFornitore: ${supplierName}\nData: ${parsedInvoice.documentDate}\nImporto: ${formatCurrency(parsedInvoice.totalAmount)}`,
+          [{ text: "OK" }]
+        );
+        setLoading(false);
+        return;
+      }
+
       const result = await inventoryStore.processInvoiceImport(
         parsedInvoice,
         inventoryItems,
