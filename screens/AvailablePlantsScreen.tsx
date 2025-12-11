@@ -10,6 +10,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { ScreenScrollView } from "@/components/ScreenScrollView";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import Spacer from "@/components/Spacer";
@@ -348,109 +349,114 @@ export default function AvailablePlantsScreen({ navigation }: AvailablePlantsScr
               </Pressable>
             </View>
 
-            <Spacer height={Spacing.lg} />
+            <KeyboardAwareScrollView 
+              style={styles.modalScrollContent}
+              contentContainerStyle={styles.modalScrollContainer}
+            >
+              {selectedLot ? (
+                <>
+                  <View style={[styles.selectedPlantInfo, { backgroundColor: theme.backgroundSecondary }]}>
+                    <ThemedText type="h4" style={{ color: theme.primary }}>
+                      {selectedLot.variety}
+                    </ThemedText>
+                    <ThemedText style={{ color: theme.textSecondary }}>
+                      Disponibili: {selectedLot.availableQuantity.toLocaleString()} piante
+                    </ThemedText>
+                  </View>
 
-            {selectedLot ? (
-              <>
-                <View style={[styles.selectedPlantInfo, { backgroundColor: theme.backgroundSecondary }]}>
-                  <ThemedText type="h4" style={{ color: theme.primary }}>
-                    {selectedLot.variety}
+                  <Spacer height={Spacing.xl} />
+
+                  <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+                    Serra
                   </ThemedText>
-                  <ThemedText style={{ color: theme.textSecondary }}>
-                    Disponibili: {selectedLot.availableQuantity.toLocaleString()} piante
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorRow}>
+                    {config?.greenhouses.map(gh => (
+                      <Pressable
+                        key={gh.id}
+                        style={[
+                          styles.selectorButton,
+                          { 
+                            backgroundColor: selectedGreenhouse === gh.id 
+                              ? theme.primary 
+                              : theme.backgroundSecondary,
+                          },
+                        ]}
+                        onPress={() => {
+                          setSelectedGreenhouse(gh.id);
+                          const sectors = getSectorsForGreenhouse(gh.id);
+                          if (sectors.length > 0) setSelectedSector(sectors[0]);
+                        }}
+                      >
+                        <ThemedText style={{ 
+                          color: selectedGreenhouse === gh.id ? '#FFFFFF' : theme.text 
+                        }}>
+                          Serra {gh.id}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+
+                  <Spacer height={Spacing.lg} />
+
+                  <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+                    Settore
                   </ThemedText>
-                </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorRow}>
+                    {getSectorsForGreenhouse(selectedGreenhouse).map(sector => (
+                      <Pressable
+                        key={sector}
+                        style={[
+                          styles.selectorButton,
+                          { 
+                            backgroundColor: selectedSector === sector 
+                              ? theme.activityWatering 
+                              : theme.backgroundSecondary,
+                          },
+                        ]}
+                        onPress={() => setSelectedSector(sector)}
+                      >
+                        <ThemedText style={{ 
+                          color: selectedSector === sector ? '#FFFFFF' : theme.text 
+                        }}>
+                          {sector}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
 
-                <Spacer height={Spacing.xl} />
+                  <Spacer height={Spacing.lg} />
 
-                <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
-                  Serra
-                </ThemedText>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorRow}>
-                  {config?.greenhouses.map(gh => (
-                    <Pressable
-                      key={gh.id}
-                      style={[
-                        styles.selectorButton,
-                        { 
-                          backgroundColor: selectedGreenhouse === gh.id 
-                            ? theme.primary 
-                            : theme.backgroundSecondary,
-                        },
-                      ]}
-                      onPress={() => {
-                        setSelectedGreenhouse(gh.id);
-                        const sectors = getSectorsForGreenhouse(gh.id);
-                        if (sectors.length > 0) setSelectedSector(sectors[0]);
-                      }}
-                    >
-                      <ThemedText style={{ 
-                        color: selectedGreenhouse === gh.id ? '#FFFFFF' : theme.text 
-                      }}>
-                        Serra {gh.id}
-                      </ThemedText>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-
-                <Spacer height={Spacing.lg} />
-
-                <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
-                  Settore
-                </ThemedText>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorRow}>
-                  {getSectorsForGreenhouse(selectedGreenhouse).map(sector => (
-                    <Pressable
-                      key={sector}
-                      style={[
-                        styles.selectorButton,
-                        { 
-                          backgroundColor: selectedSector === sector 
-                            ? theme.activityWatering 
-                            : theme.backgroundSecondary,
-                        },
-                      ]}
-                      onPress={() => setSelectedSector(sector)}
-                    >
-                      <ThemedText style={{ 
-                        color: selectedSector === sector ? '#FFFFFF' : theme.text 
-                      }}>
-                        {sector}
-                      </ThemedText>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-
-                <Spacer height={Spacing.lg} />
-
-                <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
-                  Quantità da distribuire
-                </ThemedText>
-                <TextInput
-                  style={[
-                    styles.quantityInput,
-                    { backgroundColor: theme.backgroundSecondary, color: theme.text },
-                  ]}
-                  value={quantity}
-                  onChangeText={setQuantity}
-                  keyboardType="numeric"
-                  placeholder={`Max ${selectedLot.availableQuantity}`}
-                  placeholderTextColor={theme.textSecondary}
-                />
-
-                <Spacer height={Spacing.xl} />
-
-                <Pressable
-                  style={[styles.confirmButton, { backgroundColor: theme.primary }]}
-                  onPress={confirmDistribution}
-                >
-                  <Feather name="check" size={20} color="#FFFFFF" />
-                  <ThemedText style={styles.confirmButtonText}>
-                    Conferma Distribuzione
+                  <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+                    Quantità da distribuire
                   </ThemedText>
-                </Pressable>
-              </>
-            ) : null}
+                  <TextInput
+                    style={[
+                      styles.quantityInput,
+                      { backgroundColor: theme.backgroundSecondary, color: theme.text },
+                    ]}
+                    value={quantity}
+                    onChangeText={setQuantity}
+                    keyboardType="numeric"
+                    placeholder={`Max ${selectedLot.availableQuantity}`}
+                    placeholderTextColor={theme.textSecondary}
+                  />
+
+                  <Spacer height={Spacing.xl} />
+
+                  <Pressable
+                    style={[styles.confirmButton, { backgroundColor: theme.primary }]}
+                    onPress={confirmDistribution}
+                  >
+                    <Feather name="check" size={20} color="#FFFFFF" />
+                    <ThemedText style={styles.confirmButtonText}>
+                      Conferma Distribuzione
+                    </ThemedText>
+                  </Pressable>
+
+                  <Spacer height={Spacing.xl} />
+                </>
+              ) : null}
+            </KeyboardAwareScrollView>
           </View>
         </View>
       </Modal>
@@ -543,8 +549,15 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
-    padding: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
     maxHeight: '80%',
+  },
+  modalScrollContent: {
+    flex: 1,
+  },
+  modalScrollContainer: {
+    paddingBottom: Spacing["3xl"],
   },
   modalHeader: {
     flexDirection: 'row',
