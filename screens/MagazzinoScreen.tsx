@@ -4,6 +4,7 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
 import { ScreenScrollView } from "@/components/ScreenScrollView";
 import { ThemedText } from "@/components/ThemedText";
@@ -19,92 +20,78 @@ import {
 } from "@/utils/pendingInvoiceStore";
 import { inventoryStore, MaterialRecord } from "@/utils/inventoryStore";
 import { storage } from "@/utils/storage";
-import { PlantRecord } from "@/types";
+import { plantWarehouse, GenusGroup, PlantLot } from "@/utils/plantWarehouse";
 import { LavoroStackParamList } from "@/navigation/LavoroStackNavigator";
 
 type MagazzinoScreenProps = {
   navigation: NativeStackNavigationProp<LavoroStackParamList, "Lavoro">;
 };
 
-type InventoryCategory = 'tutti' | 'piante' | 'semi' | 'vasi' | 'terriccio' | 'materiali';
+type InventoryTab = 'piante' | 'materiali';
 
-interface InventoryItem {
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const GENUS_COLORS: Record<string, string> = {
+  'Protea': '#E91E63',
+  'Leucospermum': '#FF9800',
+  'Leucadendron': '#4CAF50',
+  'Serruria': '#9C27B0',
+  'Telopea': '#F44336',
+  'Banksia': '#795548',
+  'Grevillea': '#00BCD4',
+  'Altro': '#607D8B',
+};
+
+interface MaterialItem {
   id: string;
   name: string;
-  category: InventoryCategory;
+  type: string;
   quantity: number;
   unitOfMeasure: string;
   date: string;
   notes?: string;
-  sourceDocument?: string;
 }
-
-const INVENTORY_TABS: { key: InventoryCategory; label: string; icon: string }[] = [
-  { key: 'tutti', label: 'Tutti', icon: 'grid' },
-  { key: 'piante', label: 'Piante', icon: 'sun' },
-  { key: 'semi', label: 'Semi', icon: 'disc' },
-  { key: 'vasi', label: 'Vasi', icon: 'box' },
-  { key: 'terriccio', label: 'Terriccio', icon: 'layers' },
-  { key: 'materiali', label: 'Materiali', icon: 'tool' },
-];
 
 export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
   const { theme } = useTheme();
   const tabBarHeight = useBottomTabBarHeight();
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [genusGroups, setGenusGroups] = useState<GenusGroup[]>([]);
+  const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [pendingLines, setPendingLines] = useState<PendingInvoiceLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<InventoryCategory>('tutti');
+  const [selectedTab, setSelectedTab] = useState<InventoryTab>('piante');
+  const [expandedGenus, setExpandedGenus] = useState<Set<string>>(new Set());
   const [selectedLine, setSelectedLine] = useState<PendingInvoiceLine | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [showPending, setShowPending] = useState(false);
+  const [materialFilter, setMaterialFilter] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
-      const [plantInventory, materials, pending] = await Promise.all([
-        storage.getPlantInventory(),
+      const [groups, mats, pending] = await Promise.all([
+        plantWarehouse.getGroupedByGenus(),
         inventoryStore.getMaterials(),
         pendingInvoiceStore.getUnprocessedLines(),
       ]);
 
-      const items: InventoryItem[] = [];
-
-      plantInventory.plants.forEach((plant: PlantRecord) => {
-        const isSeed = plant.variety.startsWith('[Semi]') || plant.notes?.includes('SEMI');
-        items.push({
-          id: plant.id,
-          name: plant.variety.replace('[Semi] ', ''),
-          category: isSeed ? 'semi' : 'piante',
-          quantity: plant.quantity,
-          unitOfMeasure: 'pz',
-          date: plant.arrivalDate,
-          notes: plant.notes,
-          sourceDocument: plant.sourceDocument,
-        });
-      });
-
-      materials.forEach((mat: MaterialRecord) => {
-        let category: InventoryCategory = 'materiali';
-        if (mat.type === 'vasi') category = 'vasi';
-        else if (mat.type === 'terriccio') category = 'terriccio';
-        
-        items.push({
-          id: mat.id,
-          name: mat.name,
-          category,
-          quantity: mat.quantity,
-          unitOfMeasure: mat.unitOfMeasure,
-          date: mat.arrivalDate,
-          notes: mat.notes,
-          sourceDocument: mat.sourceDocument,
-        });
-      });
-
-      items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      setInventoryItems(items);
+      setGenusGroups(groups);
+      
+      const materialItems: MaterialItem[] = mats.map((mat: MaterialRecord) => ({
+        id: mat.id,
+        name: mat.name,
+        type: mat.type,
+        quantity: mat.quantity,
+        unitOfMeasure: mat.unitOfMeasure,
+        date: mat.arrivalDate,
+        notes: mat.notes,
+      }));
+      setMaterials(materialItems);
       setPendingLines(pending);
+
+      if (groups.length > 0 && expandedGenus.size === 0) {
+        setExpandedGenus(new Set([groups[0].genus]));
+      }
     } catch (error) {
       console.error("Error loading inventory:", error);
     } finally {
@@ -123,6 +110,18 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
     setRefreshing(true);
     loadData();
   }, [loadData]);
+
+  const handleToggleGenus = (genus: string) => {
+    setExpandedGenus(prev => {
+      const next = new Set(prev);
+      if (next.has(genus)) {
+        next.delete(genus);
+      } else {
+        next.add(genus);
+      }
+      return next;
+    });
+  };
 
   const handleChangeCategory = async (newCategory: ItemCategory) => {
     if (!selectedLine) return;
@@ -257,39 +256,36 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
     }
   };
 
-  const filteredItems = selectedTab === 'tutti'
-    ? inventoryItems
-    : inventoryItems.filter(item => item.category === selectedTab);
+  const totalPlants = genusGroups.reduce((sum, g) => sum + g.totalPlants, 0);
+  const totalMaterials = materials.length;
 
-  const getCategoryCounts = () => {
-    const counts: Record<InventoryCategory, number> = {
-      tutti: inventoryItems.length,
-      piante: 0,
-      semi: 0,
-      vasi: 0,
-      terriccio: 0,
-      materiali: 0,
-    };
-    inventoryItems.forEach(item => {
-      if (counts[item.category] !== undefined) {
-        counts[item.category]++;
-      }
-    });
-    return counts;
-  };
+  const materialTypes = ['vasi', 'terriccio', 'materiale', 'altro'];
+  const getMaterialCount = (type: string) => materials.filter(m => m.type === type).length;
+  
+  const filteredMaterials = materialFilter 
+    ? materials.filter(m => m.type === materialFilter)
+    : materials;
 
-  const categoryCounts = getCategoryCounts();
   const categories = Object.keys(CATEGORY_CONFIG) as ItemCategory[];
 
-  const getCategoryColor = (cat: InventoryCategory): string => {
-    switch (cat) {
-      case 'piante': return '#4CAF50';
-      case 'semi': return '#8BC34A';
-      case 'vasi': return '#FF9800';
-      case 'terriccio': return '#795548';
-      case 'materiali': return '#607D8B';
-      default: return theme.primary;
-    }
+  const getMaterialTypeLabel = (type: string): string => {
+    const labels: Record<string, string> = {
+      'vasi': 'Vasi',
+      'terriccio': 'Terriccio',
+      'materiale': 'Materiali',
+      'altro': 'Altro',
+    };
+    return labels[type] || type;
+  };
+
+  const getMaterialTypeColor = (type: string): string => {
+    const colors: Record<string, string> = {
+      'vasi': '#FF9800',
+      'terriccio': '#795548',
+      'materiale': '#607D8B',
+      'altro': '#9E9E9E',
+    };
+    return colors[type] || theme.primary;
   };
 
   return (
@@ -300,89 +296,72 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
         }
       >
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, { backgroundColor: theme.backgroundDefault }]}>
-            <Feather name="package" size={20} color={theme.primary} />
-            <ThemedText type="h3" style={styles.statValue}>
-              {inventoryItems.length}
-            </ThemedText>
-            <ThemedText style={[styles.statLabel, { color: theme.textSecondary }]}>
-              Articoli
-            </ThemedText>
-          </View>
           <Pressable
-            style={[styles.statCard, { backgroundColor: pendingLines.length > 0 ? theme.warning + '20' : theme.backgroundDefault }]}
-            onPress={() => setShowPending(!showPending)}
+            style={[
+              styles.statCard, 
+              { 
+                backgroundColor: selectedTab === 'piante' ? theme.primary + '20' : theme.backgroundDefault,
+                borderWidth: selectedTab === 'piante' ? 2 : 0,
+                borderColor: theme.primary,
+              }
+            ]}
+            onPress={() => setSelectedTab('piante')}
           >
-            <Feather name="inbox" size={20} color={pendingLines.length > 0 ? theme.warning : theme.textSecondary} />
+            <Feather name="sun" size={20} color={theme.primary} />
             <ThemedText type="h3" style={styles.statValue}>
-              {pendingLines.length}
+              {totalPlants.toLocaleString()}
             </ThemedText>
             <ThemedText style={[styles.statLabel, { color: theme.textSecondary }]}>
-              In Attesa
+              Piante/Semi
+            </ThemedText>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.statCard, 
+              { 
+                backgroundColor: selectedTab === 'materiali' ? theme.primary + '20' : theme.backgroundDefault,
+                borderWidth: selectedTab === 'materiali' ? 2 : 0,
+                borderColor: theme.primary,
+              }
+            ]}
+            onPress={() => setSelectedTab('materiali')}
+          >
+            <Feather name="package" size={20} color="#795548" />
+            <ThemedText type="h3" style={styles.statValue}>
+              {totalMaterials}
+            </ThemedText>
+            <ThemedText style={[styles.statLabel, { color: theme.textSecondary }]}>
+              Materiali
             </ThemedText>
           </Pressable>
         </View>
 
-        <Spacer height={Spacing.lg} />
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.tabRow}>
-            {INVENTORY_TABS.map((tab) => {
-              const isActive = selectedTab === tab.key;
-              const count = categoryCounts[tab.key];
-              const color = getCategoryColor(tab.key);
-              
-              return (
-                <Pressable
-                  key={tab.key}
-                  onPress={() => setSelectedTab(tab.key)}
-                  style={[
-                    styles.tabChip,
-                    {
-                      backgroundColor: isActive ? color : theme.backgroundDefault,
-                      borderColor: isActive ? color : theme.backgroundSecondary,
-                      borderWidth: 1,
-                    },
-                  ]}
-                >
-                  <Feather
-                    name={tab.icon as any}
-                    size={14}
-                    color={isActive ? "#FFFFFF" : color}
-                  />
-                  <ThemedText
-                    style={[
-                      styles.tabText,
-                      { color: isActive ? "#FFFFFF" : theme.text },
-                    ]}
-                  >
-                    {tab.label} ({count})
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
-          </View>
-        </ScrollView>
-
-        <Spacer height={Spacing.xl} />
+        {pendingLines.length > 0 ? (
+          <>
+            <Spacer height={Spacing.md} />
+            <Pressable
+              style={[styles.pendingBanner, { backgroundColor: theme.warning + '20', borderColor: theme.warning }]}
+              onPress={() => setShowPending(!showPending)}
+            >
+              <Feather name="inbox" size={18} color={theme.warning} />
+              <ThemedText style={{ flex: 1, marginLeft: Spacing.sm }}>
+                {pendingLines.length} righe fattura in attesa di conferma
+              </ThemedText>
+              <Feather name={showPending ? "chevron-up" : "chevron-down"} size={20} color={theme.warning} />
+            </Pressable>
+          </>
+        ) : null}
 
         {showPending && pendingLines.length > 0 ? (
           <>
-            <View style={styles.sectionHeader}>
-              <ThemedText type="h4">Righe da Confermare ({pendingLines.length})</ThemedText>
-              <Pressable onPress={() => setShowPending(false)}>
-                <Feather name="x" size={20} color={theme.textSecondary} />
-              </Pressable>
-            </View>
             <Spacer height={Spacing.md} />
-
             {pendingLines.map((line) => {
               const catConfig = CATEGORY_CONFIG[line.assignedCategory];
               
               return (
                 <View
                   key={line.id}
-                  style={[styles.pendingCard, { backgroundColor: theme.warning + '10', borderColor: theme.warning + '30' }]}
+                  style={[styles.pendingCard, { backgroundColor: theme.backgroundDefault }]}
                 >
                   <View style={styles.lineHeader}>
                     <View style={[styles.categoryBadge, { backgroundColor: catConfig.color + '20' }]}>
@@ -437,83 +416,204 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
                 </View>
               );
             })}
-
-            <Spacer height={Spacing.xl} />
           </>
         ) : null}
 
-        <ThemedText type="h4" style={styles.sectionTitle}>
-          Inventario ({filteredItems.length})
-        </ThemedText>
-        <Spacer height={Spacing.md} />
+        <Spacer height={Spacing.xl} />
 
-        {filteredItems.length === 0 ? (
-          <View style={[styles.emptyState, { backgroundColor: theme.backgroundDefault }]}>
-            <Feather
-              name="package"
-              size={48}
-              color={theme.tabIconDefault}
-              style={styles.emptyIcon}
-            />
-            <ThemedText style={styles.emptyText}>
-              {selectedTab === 'tutti' ? 'Magazzino vuoto' : `Nessun articolo in ${INVENTORY_TABS.find(t => t.key === selectedTab)?.label}`}
+        {selectedTab === 'piante' ? (
+          <>
+            <ThemedText type="h4" style={styles.sectionTitle}>
+              Piante e Semi per Genere
             </ThemedText>
-            <ThemedText style={[styles.emptySubtext, { color: theme.textSecondary }]}>
-              Importa fatture XML dalla sezione Contabilita
-            </ThemedText>
-          </View>
-        ) : (
-          filteredItems.map((item) => {
-            const color = getCategoryColor(item.category);
-            const tabInfo = INVENTORY_TABS.find(t => t.key === item.category);
-            
-            return (
-              <View
-                key={item.id}
-                style={[styles.itemCard, { backgroundColor: theme.backgroundDefault }]}
-              >
-                <View style={styles.itemHeader}>
-                  <View style={[styles.categoryBadge, { backgroundColor: color + '20' }]}>
-                    <Feather name={(tabInfo?.icon || 'box') as any} size={14} color={color} />
-                    <ThemedText style={[styles.categoryText, { color }]}>
-                      {tabInfo?.label || item.category}
-                    </ThemedText>
-                  </View>
-                  <ThemedText style={[styles.itemDate, { color: theme.textSecondary }]}>
-                    {item.date}
-                  </ThemedText>
-                </View>
+            <Spacer height={Spacing.md} />
 
-                <Spacer height={Spacing.sm} />
-
-                <ThemedText style={styles.itemName} numberOfLines={2}>
-                  {item.name}
+            {genusGroups.length === 0 ? (
+              <View style={[styles.emptyState, { backgroundColor: theme.backgroundDefault }]}>
+                <Feather
+                  name="sun"
+                  size={48}
+                  color={theme.tabIconDefault}
+                  style={styles.emptyIcon}
+                />
+                <ThemedText style={styles.emptyText}>
+                  Nessuna pianta in magazzino
                 </ThemedText>
-
-                <Spacer height={Spacing.xs} />
-
-                <View style={styles.itemDetails}>
-                  <ThemedText style={[styles.itemQuantity, { color: theme.primary }]}>
-                    {item.quantity} {item.unitOfMeasure}
-                  </ThemedText>
-                  {item.sourceDocument ? (
-                    <ThemedText style={[styles.itemSource, { color: theme.textSecondary }]} numberOfLines={1}>
-                      {item.sourceDocument}
-                    </ThemedText>
-                  ) : null}
-                </View>
-
-                {item.notes ? (
-                  <>
-                    <Spacer height={Spacing.xs} />
-                    <ThemedText style={[styles.itemNotes, { color: theme.textSecondary }]} numberOfLines={2}>
-                      {item.notes}
-                    </ThemedText>
-                  </>
-                ) : null}
+                <ThemedText style={[styles.emptySubtext, { color: theme.textSecondary }]}>
+                  Importa fatture XML dalla sezione Contabilita
+                </ThemedText>
               </View>
-            );
-          })
+            ) : (
+              genusGroups.map((group) => {
+                const isExpanded = expandedGenus.has(group.genus);
+                const genusColor = GENUS_COLORS[group.genus] || theme.primary;
+                
+                return (
+                  <View 
+                    key={group.genus} 
+                    style={[styles.genusCard, { backgroundColor: theme.backgroundDefault }]}
+                  >
+                    <Pressable
+                      onPress={() => handleToggleGenus(group.genus)}
+                      style={styles.genusHeader}
+                    >
+                      <View style={[styles.genusIcon, { backgroundColor: genusColor }]}>
+                        <Feather name="sun" size={18} color="#FFFFFF" />
+                      </View>
+                      <View style={styles.genusInfo}>
+                        <ThemedText type="h4">{group.genus}</ThemedText>
+                        <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+                          {group.varieties.length} varieta
+                        </ThemedText>
+                      </View>
+                      <View style={styles.genusTotalBadge}>
+                        <ThemedText style={[styles.genusTotalText, { color: genusColor }]}>
+                          {group.totalPlants.toLocaleString()}
+                        </ThemedText>
+                        <ThemedText style={{ color: theme.textSecondary, fontSize: 10 }}>disponibili</ThemedText>
+                      </View>
+                      <Feather 
+                        name={isExpanded ? "chevron-up" : "chevron-down"} 
+                        size={22} 
+                        color={theme.textSecondary} 
+                      />
+                    </Pressable>
+                    
+                    {isExpanded ? (
+                      <View style={styles.varietiesList}>
+                        {group.varieties.map((lot, index) => (
+                          <View 
+                            key={`${lot.variety}-${index}`}
+                            style={[styles.varietyRow, { backgroundColor: theme.backgroundSecondary }]}
+                          >
+                            <View style={styles.varietyInfo}>
+                              <ThemedText style={styles.varietyName}>{lot.variety}</ThemedText>
+                              <ThemedText style={{ color: theme.textSecondary, fontSize: 11 }}>
+                                Totale: {lot.totalQuantity.toLocaleString()} | Distribuite: {lot.distributedQuantity.toLocaleString()}
+                              </ThemedText>
+                            </View>
+                            <View style={styles.quantityBadge}>
+                              <ThemedText style={[
+                                styles.quantityText,
+                                { color: lot.availableQuantity > 0 ? theme.primary : theme.textSecondary }
+                              ]}>
+                                {lot.availableQuantity.toLocaleString()}
+                              </ThemedText>
+                              <ThemedText style={{ color: theme.textSecondary, fontSize: 9 }}>disp.</ThemedText>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })
+            )}
+          </>
+        ) : (
+          <>
+            <ThemedText type="h4" style={styles.sectionTitle}>
+              Materiali per Tipo
+            </ThemedText>
+            <Spacer height={Spacing.sm} />
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.filterRow}>
+                <Pressable
+                  onPress={() => setMaterialFilter(null)}
+                  style={[
+                    styles.filterChip,
+                    { backgroundColor: !materialFilter ? theme.primary : theme.backgroundDefault }
+                  ]}
+                >
+                  <ThemedText style={{ color: !materialFilter ? '#FFFFFF' : theme.text, fontSize: 13 }}>
+                    Tutti ({totalMaterials})
+                  </ThemedText>
+                </Pressable>
+                {materialTypes.map((type) => {
+                  const count = getMaterialCount(type);
+                  if (count === 0) return null;
+                  const color = getMaterialTypeColor(type);
+                  const isActive = materialFilter === type;
+                  
+                  return (
+                    <Pressable
+                      key={type}
+                      onPress={() => setMaterialFilter(isActive ? null : type)}
+                      style={[
+                        styles.filterChip,
+                        { backgroundColor: isActive ? color : theme.backgroundDefault }
+                      ]}
+                    >
+                      <ThemedText style={{ color: isActive ? '#FFFFFF' : theme.text, fontSize: 13 }}>
+                        {getMaterialTypeLabel(type)} ({count})
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <Spacer height={Spacing.lg} />
+
+            {filteredMaterials.length === 0 ? (
+              <View style={[styles.emptyState, { backgroundColor: theme.backgroundDefault }]}>
+                <Feather
+                  name="package"
+                  size={48}
+                  color={theme.tabIconDefault}
+                  style={styles.emptyIcon}
+                />
+                <ThemedText style={styles.emptyText}>
+                  Nessun materiale in magazzino
+                </ThemedText>
+                <ThemedText style={[styles.emptySubtext, { color: theme.textSecondary }]}>
+                  Importa fatture XML dalla sezione Contabilita
+                </ThemedText>
+              </View>
+            ) : (
+              filteredMaterials.map((item) => {
+                const color = getMaterialTypeColor(item.type);
+                
+                return (
+                  <View
+                    key={item.id}
+                    style={[styles.materialCard, { backgroundColor: theme.backgroundDefault }]}
+                  >
+                    <View style={styles.materialHeader}>
+                      <View style={[styles.categoryBadge, { backgroundColor: color + '20' }]}>
+                        <Feather name="box" size={14} color={color} />
+                        <ThemedText style={[styles.categoryText, { color }]}>
+                          {getMaterialTypeLabel(item.type)}
+                        </ThemedText>
+                      </View>
+                      <ThemedText style={[styles.materialDate, { color: theme.textSecondary }]}>
+                        {item.date}
+                      </ThemedText>
+                    </View>
+
+                    <Spacer height={Spacing.sm} />
+
+                    <ThemedText style={styles.materialName} numberOfLines={2}>
+                      {item.name}
+                    </ThemedText>
+
+                    <View style={styles.materialDetails}>
+                      <ThemedText style={[styles.materialQuantity, { color: theme.primary }]}>
+                        {item.quantity} {item.unitOfMeasure}
+                      </ThemedText>
+                    </View>
+
+                    {item.notes ? (
+                      <ThemedText style={[styles.materialNotes, { color: theme.textSecondary }]} numberOfLines={1}>
+                        {item.notes}
+                      </ThemedText>
+                    ) : null}
+                  </View>
+                );
+              })
+            )}
+          </>
         )}
 
         <Spacer height={80} />
@@ -598,30 +698,25 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 12,
   },
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
   sectionTitle: {
     marginBottom: Spacing.xs,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  tabRow: {
+  filterRow: {
     flexDirection: "row",
     gap: Spacing.sm,
     paddingRight: Spacing.xl,
   },
-  tabChip: {
-    flexDirection: "row",
-    alignItems: "center",
+  filterChip: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
-    gap: Spacing.xs,
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: "500",
   },
   emptyState: {
     padding: Spacing["3xl"],
@@ -641,46 +736,96 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 14,
   },
-  itemCard: {
+  genusCard: {
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
+    overflow: 'hidden',
+  },
+  genusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  genusIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  genusInfo: {
+    flex: 1,
+  },
+  genusTotalBadge: {
+    alignItems: 'flex-end',
+    marginRight: Spacing.sm,
+  },
+  genusTotalText: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  varietiesList: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+  },
+  varietyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.xs,
+  },
+  varietyInfo: {
+    flex: 1,
+  },
+  varietyName: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  quantityBadge: {
+    alignItems: 'flex-end',
+  },
+  quantityText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  materialCard: {
     padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.md,
   },
-  itemHeader: {
+  materialHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  itemDate: {
+  materialDate: {
     fontSize: 12,
   },
-  itemName: {
+  materialName: {
     fontSize: 15,
     fontWeight: '600',
   },
-  itemDetails: {
+  materialDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: Spacing.xs,
   },
-  itemQuantity: {
+  materialQuantity: {
     fontSize: 16,
     fontWeight: '700',
   },
-  itemSource: {
-    fontSize: 11,
-    flex: 1,
-    textAlign: 'right',
-    marginLeft: Spacing.md,
-  },
-  itemNotes: {
+  materialNotes: {
     fontSize: 12,
+    marginTop: Spacing.xs,
   },
   pendingCard: {
     padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.md,
-    borderWidth: 1,
   },
   lineHeader: {
     flexDirection: 'row',
