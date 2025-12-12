@@ -23,6 +23,7 @@ import {
 } from "@/utils/xmlImportService";
 import { inventoryStore } from "@/utils/inventoryStore";
 import { pendingInvoiceStore, ItemCategory } from "@/utils/pendingInvoiceStore";
+import { importInvoiceToPending } from "@/services/invoiceImportService";
 import { resetAllData, clearImportedData, getDataStats } from "@/utils/debugTools";
 import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_REVENUE_CATEGORIES } from "@/types";
 import { AccountingStackParamList } from "@/navigation/AccountingStackNavigator";
@@ -183,27 +184,35 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
 
       const txResult = await inventoryStore.addTransaction(parsedInvoice, selectedCategory);
 
-      const supplierName = parsedInvoice.supplier?.denomination || 'Fornitore';
-      const pendingLines = inventoryItems
-        .filter(item => item.selected)
-        .map(item => ({
-          invoiceNumber: `FT ${parsedInvoice.documentNumber}`,
-          invoiceDate: parsedInvoice.documentDate,
-          supplierName,
-          lineNumber: item.lineNumber,
-          description: item.description,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          totalPrice: item.quantity * item.unitPrice,
-          unitOfMeasure: item.unitOfMeasure,
-          vatRate: undefined,
-          detectedCategory: (item.itemType || 'altro') as ItemCategory,
-          assignedCategory: (item.itemType || 'altro') as ItemCategory,
-          isProcessed: false,
-        }));
+      const selectedItems = inventoryItems.filter(item => item.selected);
+      let linesImported = 0;
 
-      if (pendingLines.length > 0) {
+      if (selectedItems.length > 0) {
+        const { classificaRiga } = await import('@/utils/autoCategorizationService');
+        
+        const pendingLines = selectedItems.map(item => {
+          const categ = classificaRiga(item.description);
+          return {
+            invoiceNumber: `FT ${parsedInvoice.documentNumber}`,
+            invoiceDate: parsedInvoice.documentDate,
+            supplierName: parsedInvoice.supplier?.denomination || 'Fornitore',
+            lineNumber: item.lineNumber,
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.quantity * item.unitPrice,
+            unitOfMeasure: item.unitOfMeasure,
+            vatRate: undefined,
+            detectedCategory: (item.itemType || 'altro') as ItemCategory,
+            assignedCategory: (item.itemType || 'altro') as ItemCategory,
+            categoria: categ.categoria,
+            sottoCategoriaUtenza: categ.sottoCategoriaUtenza,
+            isProcessed: false,
+          };
+        });
+
         await pendingInvoiceStore.savePendingLines(pendingLines);
+        linesImported = pendingLines.length;
       }
 
       const messageParts = [
@@ -212,8 +221,8 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
         txResult.success ? "Movimento contabile registrato." : "",
       ].filter(Boolean);
 
-      if (pendingLines.length > 0) {
-        messageParts.push(`\nRighe in attesa: ${pendingLines.length}`);
+      if (linesImported > 0) {
+        messageParts.push(`\nRighe in attesa: ${linesImported}`);
         messageParts.push(`Vai in Magazzino per verificare e confermare le assegnazioni.`);
       }
 
