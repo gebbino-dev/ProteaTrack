@@ -356,26 +356,8 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       <Spacer height={Spacing["3xl"]} />
 
       <ThemedText type="h4" style={styles.sectionTitle}>
-        Gestione Inventario
+        Scansione Documenti
       </ThemedText>
-
-      <Spacer height={Spacing.lg} />
-
-      <Pressable
-        style={({ pressed }) => [
-          styles.saveButton,
-          {
-            backgroundColor: theme.primary,
-            opacity: pressed ? 0.8 : 1,
-          },
-        ]}
-        onPress={() => navigation.navigate("PlantInventory")}
-      >
-        <Feather name="database" size={20} color="#FFFFFF" />
-        <ThemedText style={styles.saveButtonText}>
-          Gestisci Inventario Piante
-        </ThemedText>
-      </Pressable>
 
       <Spacer height={Spacing.lg} />
 
@@ -394,6 +376,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           Scansiona Documento
         </ThemedText>
       </Pressable>
+
+      <ThemedText style={[styles.infoText, { color: theme.textSecondary, marginTop: Spacing.sm }]}>
+        Inventario piante ora disponibile in Magazzino
+      </ThemedText>
 
       <Spacer height={Spacing["3xl"]} />
 

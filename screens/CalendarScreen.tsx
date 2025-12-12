@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { View, StyleSheet, Pressable, FlatList } from "react-native";
+import { View, StyleSheet, Pressable, FlatList, ScrollView } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -10,11 +10,9 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import Spacer from "@/components/Spacer";
-import { ActivityCard } from "@/components/ActivityCard";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { storage } from "@/utils/storage";
-import { Activity, ACTIVITY_TYPES, ActivityType } from "@/types";
+import { eventAggregator, CalendarEvent, CalendarEventType } from "@/utils/eventAggregator";
 import { CalendarStackParamList } from "@/navigation/CalendarStackNavigator";
 
 type CalendarScreenProps = {
@@ -27,25 +25,52 @@ const MONTHS = [
   "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"
 ];
 
+const EVENT_TYPE_CONFIG: Record<CalendarEventType, { label: string; icon: string }> = {
+  activity: { label: 'Attiv.', icon: 'activity' },
+  treatment: { label: 'Tratt.', icon: 'shield' },
+  plant_arrival: { label: 'Piante', icon: 'sun' },
+  transaction: { label: 'Cont.', icon: 'dollar-sign' },
+  pending_import: { label: 'Import', icon: 'inbox' },
+};
+
 export default function CalendarScreen({ navigation }: CalendarScreenProps) {
   const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
-  const insets = useSafeAreaInsets();
   
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [eventDates, setEventDates] = useState<Map<string, CalendarEventType[]>>(new Map());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedFilter, setSelectedFilter] = useState<ActivityType | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState<CalendarEventType | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadAllData = useCallback(async () => {
+    try {
+      const dates = await eventAggregator.getAllEventDates();
+      setEventDates(dates);
+    } catch (error) {
+      console.error('Error loading event dates:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadEventsForDate = useCallback(async (date: Date) => {
+    try {
+      const dateStr = date.toISOString().split('T')[0];
+      const dayEvents = await eventAggregator.getEventsForDate(dateStr);
+      setEvents(dayEvents);
+    } catch (error) {
+      console.error('Error loading events:', error);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      const loadActivities = async () => {
-        const data = await storage.getActivities();
-        setActivities(data);
-      };
-      loadActivities();
-    }, [])
+      loadAllData();
+      loadEventsForDate(selectedDate);
+    }, [loadAllData, loadEventsForDate, selectedDate])
   );
 
   const getDaysInMonth = (date: Date) => {
@@ -69,23 +94,12 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
     return days;
   };
 
-  const getActivityDates = useMemo(() => {
-    const dates = new Set<string>();
-    activities.forEach((a) => {
-      const date = a.date.split("T")[0];
-      dates.add(date);
-    });
-    return dates;
-  }, [activities]);
-
-  const filteredActivities = useMemo(() => {
-    const dateStr = selectedDate.toISOString().split("T")[0];
-    let filtered = activities.filter((a) => a.date.startsWith(dateStr));
+  const filteredEvents = useMemo(() => {
     if (selectedFilter) {
-      filtered = filtered.filter((a) => a.type === selectedFilter);
+      return events.filter(e => e.type === selectedFilter);
     }
-    return filtered;
-  }, [activities, selectedDate, selectedFilter]);
+    return events;
+  }, [events, selectedFilter]);
 
   const navigateMonth = (direction: number) => {
     const newDate = new Date(currentMonth);
@@ -110,17 +124,39 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
     );
   };
 
-  const hasActivity = (day: number) => {
+  const getEventTypesForDay = (day: number): CalendarEventType[] => {
     const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    return getActivityDates.has(dateStr);
+    return eventDates.get(dateStr) || [];
   };
 
   const handleDayPress = (day: number) => {
     const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
     setSelectedDate(newDate);
+    loadEventsForDate(newDate);
   };
 
   const days = getDaysInMonth(currentMonth);
+
+  const renderEventCard = ({ item }: { item: CalendarEvent }) => (
+    <View style={[styles.eventCard, { backgroundColor: theme.backgroundDefault }]}>
+      <View style={[styles.eventIconContainer, { backgroundColor: item.color + '20' }]}>
+        <Feather name={item.icon as any} size={18} color={item.color} />
+      </View>
+      <View style={styles.eventContent}>
+        <ThemedText style={styles.eventTitle} numberOfLines={1}>
+          {item.title}
+        </ThemedText>
+        <ThemedText style={[styles.eventSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+          {item.subtitle}
+        </ThemedText>
+      </View>
+      <View style={[styles.eventTypeBadge, { backgroundColor: item.color + '20' }]}>
+        <ThemedText style={[styles.eventTypeText, { color: item.color }]}>
+          {EVENT_TYPE_CONFIG[item.type].label}
+        </ThemedText>
+      </View>
+    </View>
+  );
 
   return (
     <ThemedView style={styles.container}>
@@ -162,104 +198,128 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
           </View>
 
           <View style={styles.daysGrid}>
-            {days.map((day, index) => (
-              <Pressable
-                key={index}
-                style={[
-                  styles.dayCell,
-                  day !== null && isSelected(day) && {
-                    backgroundColor: theme.primary,
-                    borderRadius: BorderRadius.sm,
-                  },
-                  day !== null && isToday(day) && !isSelected(day) && {
-                    borderWidth: 2,
-                    borderColor: theme.primary,
-                    borderRadius: BorderRadius.sm,
-                  },
-                ]}
-                onPress={() => day !== null && handleDayPress(day)}
-                disabled={day === null}
-              >
-                {day !== null ? (
-                  <>
-                    <ThemedText
-                      style={[
-                        styles.dayText,
-                        isSelected(day) && { color: "#FFFFFF" },
-                      ]}
-                    >
-                      {day}
-                    </ThemedText>
-                    {hasActivity(day) ? (
-                      <View
+            {days.map((day, index) => {
+              const eventTypes = day !== null ? getEventTypesForDay(day) : [];
+              const hasEvents = eventTypes.length > 0;
+              
+              return (
+                <Pressable
+                  key={index}
+                  style={[
+                    styles.dayCell,
+                    day !== null && isSelected(day) && {
+                      backgroundColor: theme.primary,
+                      borderRadius: BorderRadius.sm,
+                    },
+                    day !== null && isToday(day) && !isSelected(day) && {
+                      borderWidth: 2,
+                      borderColor: theme.primary,
+                      borderRadius: BorderRadius.sm,
+                    },
+                  ]}
+                  onPress={() => day !== null && handleDayPress(day)}
+                  disabled={day === null}
+                >
+                  {day !== null ? (
+                    <>
+                      <ThemedText
                         style={[
-                          styles.activityDot,
-                          {
-                            backgroundColor: isSelected(day)
-                              ? "#FFFFFF"
-                              : theme.primary,
-                          },
+                          styles.dayText,
+                          isSelected(day) && { color: "#FFFFFF" },
                         ]}
-                      />
-                    ) : null}
-                  </>
-                ) : null}
-              </Pressable>
-            ))}
+                      >
+                        {day}
+                      </ThemedText>
+                      {hasEvents ? (
+                        <View style={styles.eventDotsRow}>
+                          {eventTypes.slice(0, 3).map((type, i) => (
+                            <View
+                              key={i}
+                              style={[
+                                styles.eventDot,
+                                {
+                                  backgroundColor: isSelected(day)
+                                    ? "#FFFFFF"
+                                    : eventAggregator.getEventColor(type),
+                                },
+                              ]}
+                            />
+                          ))}
+                        </View>
+                      ) : null}
+                    </>
+                  ) : null}
+                </Pressable>
+              );
+            })}
           </View>
         </View>
 
-        <View style={styles.filterRow}>
-          <Pressable
-            style={[
-              styles.filterChip,
-              {
-                backgroundColor: selectedFilter === null
-                  ? theme.primary
-                  : theme.backgroundDefault,
-              },
-            ]}
-            onPress={() => setSelectedFilter(null)}
-          >
-            <ThemedText
-              style={[
-                styles.filterText,
-                { color: selectedFilter === null ? "#FFFFFF" : theme.text },
-              ]}
-            >
-              Tutti
-            </ThemedText>
-          </Pressable>
-          {ACTIVITY_TYPES.slice(0, 4).map((type) => (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterScrollView}
+        >
+          <View style={styles.filterRow}>
             <Pressable
-              key={type.value}
               style={[
                 styles.filterChip,
                 {
-                  backgroundColor: selectedFilter === type.value
+                  backgroundColor: selectedFilter === null
                     ? theme.primary
                     : theme.backgroundDefault,
                 },
               ]}
-              onPress={() => setSelectedFilter(
-                selectedFilter === type.value ? null : type.value
-              )}
+              onPress={() => setSelectedFilter(null)}
             >
               <ThemedText
                 style={[
                   styles.filterText,
-                  { color: selectedFilter === type.value ? "#FFFFFF" : theme.text },
+                  { color: selectedFilter === null ? "#FFFFFF" : theme.text },
                 ]}
               >
-                {type.label.substring(0, 4)}
+                Tutti
               </ThemedText>
             </Pressable>
-          ))}
-        </View>
+            {(Object.keys(EVENT_TYPE_CONFIG) as CalendarEventType[])
+              .filter(type => type !== 'pending_import')
+              .map((type) => (
+                <Pressable
+                  key={type}
+                  style={[
+                    styles.filterChip,
+                    {
+                      backgroundColor: selectedFilter === type
+                        ? eventAggregator.getEventColor(type)
+                        : theme.backgroundDefault,
+                    },
+                  ]}
+                  onPress={() => setSelectedFilter(
+                    selectedFilter === type ? null : type
+                  )}
+                >
+                  <Feather 
+                    name={EVENT_TYPE_CONFIG[type].icon as any} 
+                    size={14} 
+                    color={selectedFilter === type ? "#FFFFFF" : theme.text}
+                    style={{ marginRight: 4 }}
+                  />
+                  <ThemedText
+                    style={[
+                      styles.filterText,
+                      { color: selectedFilter === type ? "#FFFFFF" : theme.text },
+                    ]}
+                  >
+                    {EVENT_TYPE_CONFIG[type].label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+          </View>
+        </ScrollView>
       </View>
 
       <FlatList
-        data={filteredActivities}
+        data={filteredEvents}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[
           styles.listContent,
@@ -275,15 +335,11 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
               })}
             </ThemedText>
             <ThemedText style={{ color: theme.textSecondary }}>
-              {filteredActivities.length} attività
+              {filteredEvents.length} eventi
             </ThemedText>
           </View>
         }
-        renderItem={({ item }) => (
-          <View style={styles.activityItem}>
-            <ActivityCard activity={item} />
-          </View>
-        )}
+        renderItem={renderEventCard}
         ListEmptyComponent={
           <View
             style={[styles.emptyState, { backgroundColor: theme.backgroundDefault }]}
@@ -291,7 +347,10 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
             <Feather name="calendar" size={40} color={theme.tabIconDefault} />
             <Spacer height={Spacing.md} />
             <ThemedText style={{ textAlign: "center" }}>
-              Nessuna attività per questa data
+              Nessun evento per questa data
+            </ThemedText>
+            <ThemedText style={{ textAlign: "center", color: theme.textSecondary, marginTop: 8 }}>
+              Attivita, trattamenti, arrivi piante e movimenti contabili appariranno qui
             </ThemedText>
           </View>
         }
@@ -343,18 +402,27 @@ const styles = StyleSheet.create({
   dayText: {
     fontSize: 16,
   },
-  activityDot: {
+  eventDotsRow: {
+    flexDirection: 'row',
+    marginTop: 2,
+    gap: 2,
+  },
+  eventDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    marginTop: 2,
+  },
+  filterScrollView: {
+    marginTop: Spacing.md,
   },
   filterRow: {
     flexDirection: "row",
-    marginTop: Spacing.md,
     gap: Spacing.xs,
+    paddingRight: Spacing.xl,
   },
   filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
@@ -373,8 +441,40 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: Spacing.md,
   },
-  activityItem: {
-    marginBottom: Spacing.md,
+  eventCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.sm,
+  },
+  eventIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eventContent: {
+    flex: 1,
+    marginLeft: Spacing.md,
+  },
+  eventTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  eventSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  eventTypeBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+  },
+  eventTypeText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   emptyState: {
     padding: Spacing["2xl"],

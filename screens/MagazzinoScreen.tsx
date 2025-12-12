@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from "react";
-import { View, StyleSheet, Pressable, RefreshControl, Modal, ScrollView, Alert, Platform } from "react-native";
+import { View, StyleSheet, Pressable, RefreshControl, Modal, ScrollView, Alert, Platform, TextInput } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenScrollView } from "@/components/ScreenScrollView";
 import { ThemedText } from "@/components/ThemedText";
@@ -19,8 +20,9 @@ import {
 } from "@/utils/pendingInvoiceStore";
 import { inventoryStore, MaterialRecord } from "@/utils/inventoryStore";
 import { storage } from "@/utils/storage";
-import { plantWarehouse, GenusGroup } from "@/utils/plantWarehouse";
+import { plantWarehouse, GenusGroup, PlantLot } from "@/utils/plantWarehouse";
 import { LavoroStackParamList } from "@/navigation/LavoroStackNavigator";
+import { PlantRecord } from "@/types";
 
 type MagazzinoScreenProps = {
   navigation: NativeStackNavigationProp<LavoroStackParamList, "Lavoro">;
@@ -50,7 +52,9 @@ const MATERIAL_TYPE_CONFIG: Record<MaterialType, { label: string; color: string;
 export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
   const { theme } = useTheme();
   const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const [genusGroups, setGenusGroups] = useState<GenusGroup[]>([]);
+  const [allPlants, setAllPlants] = useState<PlantRecord[]>([]);
   const [materials, setMaterials] = useState<MaterialRecord[]>([]);
   const [pendingLines, setPendingLines] = useState<PendingInvoiceLine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,18 +68,29 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
   
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialRecord | null>(null);
   const [materialModalVisible, setMaterialModalVisible] = useState(false);
+  
+  const [plantModalVisible, setPlantModalVisible] = useState(false);
+  const [editingPlant, setEditingPlant] = useState<PlantRecord | null>(null);
+  const [plantForm, setPlantForm] = useState({
+    variety: '',
+    quantity: '',
+    arrivalDate: new Date().toISOString().split('T')[0],
+    notes: '',
+  });
 
   const loadData = useCallback(async () => {
     try {
-      const [groups, mats, pending] = await Promise.all([
+      const [groups, mats, pending, inventory] = await Promise.all([
         plantWarehouse.getGroupedByGenus(),
         inventoryStore.getMaterials(),
         pendingInvoiceStore.getUnprocessedLines(),
+        storage.getPlantInventory(),
       ]);
 
       setGenusGroups(groups);
       setMaterials(mats);
       setPendingLines(pending);
+      setAllPlants(inventory.plants);
 
       if (groups.length > 0 && expandedGenus.size === 0) {
         setExpandedGenus(new Set([groups[0].genus]));
@@ -283,6 +298,85 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
     }
   };
 
+  const resetPlantForm = () => {
+    setPlantForm({
+      variety: '',
+      quantity: '',
+      arrivalDate: new Date().toISOString().split('T')[0],
+      notes: '',
+    });
+    setEditingPlant(null);
+  };
+
+  const handleOpenPlantModal = () => {
+    resetPlantForm();
+    setPlantModalVisible(true);
+  };
+
+  const handleEditPlant = (plant: PlantRecord) => {
+    setEditingPlant(plant);
+    setPlantForm({
+      variety: plant.variety,
+      quantity: plant.quantity.toString(),
+      arrivalDate: plant.arrivalDate,
+      notes: plant.notes || '',
+    });
+    setPlantModalVisible(true);
+  };
+
+  const handleSavePlant = async () => {
+    if (!plantForm.variety.trim()) {
+      Alert.alert("Errore", "Inserisci la varieta");
+      return;
+    }
+
+    try {
+      if (editingPlant) {
+        await storage.deletePlantRecord(editingPlant.id);
+      }
+      
+      await storage.savePlantRecord({
+        variety: plantForm.variety.trim(),
+        quantity: parseInt(plantForm.quantity) || 0,
+        arrivalDate: plantForm.arrivalDate,
+        notes: plantForm.notes.trim(),
+      });
+      
+      setPlantModalVisible(false);
+      resetPlantForm();
+      loadData();
+    } catch (error) {
+      console.error("Error saving plant:", error);
+      Alert.alert("Errore", "Impossibile salvare");
+    }
+  };
+
+  const handleDeletePlant = async (plant: PlantRecord) => {
+    const deleteAction = async () => {
+      try {
+        await storage.deletePlantRecord(plant.id);
+        loadData();
+      } catch (error) {
+        console.error("Error deleting plant:", error);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm(`Eliminare "${plant.variety}"?`)) {
+        deleteAction();
+      }
+    } else {
+      Alert.alert(
+        "Elimina Pianta",
+        `Eliminare "${plant.variety}"?`,
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: "Elimina", style: "destructive", onPress: deleteAction },
+        ]
+      );
+    }
+  };
+
   const totalPlants = genusGroups.reduce((sum, g) => sum + g.totalPlants, 0);
   const totalMaterials = materials.length;
 
@@ -442,12 +536,23 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
 
         {selectedTab === 'piante' ? (
           <>
-            <ThemedText type="h4" style={styles.sectionTitle}>
-              Piante e Semi per Genere
-            </ThemedText>
-            <ThemedText style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-              Da categoria "Acquisto Piante"
-            </ThemedText>
+            <View style={styles.sectionHeaderRow}>
+              <View>
+                <ThemedText type="h4" style={styles.sectionTitle}>
+                  Piante e Semi per Genere
+                </ThemedText>
+                <ThemedText style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                  Premi su una varieta per modificare
+                </ThemedText>
+              </View>
+              <Pressable
+                style={[styles.addButton, { backgroundColor: theme.primary }]}
+                onPress={handleOpenPlantModal}
+              >
+                <Feather name="plus" size={18} color="#FFFFFF" />
+                <ThemedText style={styles.addButtonText}>Aggiungi</ThemedText>
+              </Pressable>
+            </View>
             <Spacer height={Spacing.md} />
 
             {genusGroups.length === 0 ? (
@@ -503,28 +608,55 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
                     
                     {isExpanded ? (
                       <View style={styles.varietiesList}>
-                        {group.varieties.map((lot, index) => (
-                          <View 
-                            key={`${lot.variety}-${index}`}
-                            style={[styles.varietyRow, { backgroundColor: theme.backgroundSecondary }]}
-                          >
-                            <View style={styles.varietyInfo}>
-                              <ThemedText style={styles.varietyName}>{lot.variety}</ThemedText>
-                              <ThemedText style={{ color: theme.textSecondary, fontSize: 11 }}>
-                                Totale: {lot.totalQuantity.toLocaleString()} | Distribuite: {lot.distributedQuantity.toLocaleString()}
-                              </ThemedText>
-                            </View>
-                            <View style={styles.quantityBadge}>
-                              <ThemedText style={[
-                                styles.quantityText,
-                                { color: lot.availableQuantity > 0 ? theme.primary : theme.textSecondary }
-                              ]}>
-                                {lot.availableQuantity.toLocaleString()}
-                              </ThemedText>
-                              <ThemedText style={{ color: theme.textSecondary, fontSize: 9 }}>disp.</ThemedText>
-                            </View>
-                          </View>
-                        ))}
+                        {group.varieties.map((lot, index) => {
+                          const matchingPlants = allPlants.filter(p => 
+                            p.variety.toLowerCase().includes(lot.variety.toLowerCase()) ||
+                            lot.variety.toLowerCase().includes(p.variety.toLowerCase().substring(0, 10))
+                          );
+                          const firstMatchingPlant = matchingPlants[0];
+                          
+                          return (
+                            <Pressable 
+                              key={`${lot.variety}-${index}`}
+                              style={[styles.varietyRow, { backgroundColor: theme.backgroundSecondary }]}
+                              onPress={() => firstMatchingPlant && handleEditPlant(firstMatchingPlant)}
+                            >
+                              <View style={styles.varietyInfo}>
+                                <ThemedText style={styles.varietyName}>{lot.variety}</ThemedText>
+                                <ThemedText style={{ color: theme.textSecondary, fontSize: 11 }}>
+                                  Totale: {lot.totalQuantity.toLocaleString()} | Distribuite: {lot.distributedQuantity.toLocaleString()}
+                                </ThemedText>
+                                {lot.sources.length > 0 ? (
+                                  <ThemedText style={{ color: theme.textSecondary, fontSize: 10, marginTop: 2 }}>
+                                    Arrivo: {lot.sources[0].arrivalDate}
+                                  </ThemedText>
+                                ) : null}
+                              </View>
+                              <View style={styles.varietyActions}>
+                                <View style={styles.quantityBadge}>
+                                  <ThemedText style={[
+                                    styles.quantityText,
+                                    { color: lot.availableQuantity > 0 ? theme.primary : theme.textSecondary }
+                                  ]}>
+                                    {lot.availableQuantity.toLocaleString()}
+                                  </ThemedText>
+                                  <ThemedText style={{ color: theme.textSecondary, fontSize: 9 }}>disp.</ThemedText>
+                                </View>
+                                {firstMatchingPlant ? (
+                                  <Pressable
+                                    style={[styles.smallActionButton, { backgroundColor: theme.error + '15' }]}
+                                    onPress={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePlant(firstMatchingPlant);
+                                    }}
+                                  >
+                                    <Feather name="trash-2" size={14} color={theme.error} />
+                                  </Pressable>
+                                ) : null}
+                              </View>
+                            </Pressable>
+                          );
+                        })}
                       </View>
                     ) : null}
                   </View>
@@ -768,6 +900,90 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
 
             <Spacer height={Spacing.xl} />
           </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={plantModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPlantModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <ScrollView 
+            style={[styles.modalContent, { backgroundColor: theme.backgroundDefault }]}
+            contentContainerStyle={styles.plantFormContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.modalHeader}>
+              <ThemedText type="h4">
+                {editingPlant ? "Modifica Pianta" : "Nuova Pianta"}
+              </ThemedText>
+              <Pressable onPress={() => setPlantModalVisible(false)}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+
+            <Spacer height={Spacing.xl} />
+
+            <ThemedText style={styles.inputLabel}>Varieta *</ThemedText>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: theme.backgroundSecondary, color: theme.text }]}
+              value={plantForm.variety}
+              onChangeText={(t) => setPlantForm({ ...plantForm, variety: t })}
+              placeholder="Es. Leucospermum cordifolium"
+              placeholderTextColor={theme.textSecondary}
+            />
+
+            <Spacer height={Spacing.lg} />
+
+            <ThemedText style={styles.inputLabel}>Quantita</ThemedText>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: theme.backgroundSecondary, color: theme.text }]}
+              value={plantForm.quantity}
+              onChangeText={(t) => setPlantForm({ ...plantForm, quantity: t })}
+              placeholder="0"
+              placeholderTextColor={theme.textSecondary}
+              keyboardType="number-pad"
+            />
+
+            <Spacer height={Spacing.lg} />
+
+            <ThemedText style={styles.inputLabel}>Data Arrivo</ThemedText>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: theme.backgroundSecondary, color: theme.text }]}
+              value={plantForm.arrivalDate}
+              onChangeText={(t) => setPlantForm({ ...plantForm, arrivalDate: t })}
+              placeholder="AAAA-MM-GG"
+              placeholderTextColor={theme.textSecondary}
+            />
+
+            <Spacer height={Spacing.lg} />
+
+            <ThemedText style={styles.inputLabel}>Note</ThemedText>
+            <TextInput
+              style={[styles.textInput, styles.textInputMultiline, { backgroundColor: theme.backgroundSecondary, color: theme.text }]}
+              value={plantForm.notes}
+              onChangeText={(t) => setPlantForm({ ...plantForm, notes: t })}
+              placeholder="Note opzionali..."
+              placeholderTextColor={theme.textSecondary}
+              multiline
+              numberOfLines={3}
+            />
+
+            <Spacer height={Spacing.xl} />
+
+            <Pressable
+              style={[styles.saveButton, { backgroundColor: theme.primary }]}
+              onPress={handleSavePlant}
+            >
+              <ThemedText style={styles.saveButtonText}>
+                {editingPlant ? "Salva Modifiche" : "Aggiungi Pianta"}
+              </ThemedText>
+            </Pressable>
+
+            <Spacer height={Spacing.xl} />
+          </ScrollView>
         </View>
       </Modal>
     </ThemedView>
@@ -1024,5 +1240,55 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '500',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.xs,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  varietyActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  plantFormContent: {
+    paddingBottom: Spacing.xl,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: Spacing.xs,
+  },
+  textInput: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    fontSize: 16,
+  },
+  textInputMultiline: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  saveButton: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
