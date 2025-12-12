@@ -77,51 +77,33 @@ export default function CategoriaFilterScreen({ navigation }: CategoriaFilterScr
     loadData();
   }, [loadData]);
 
-  const handleClassificaTutte = async () => {
-    const runClassification = async () => {
-      console.log('[CategoriaFilter] Avvio classificazione...');
+  const handleClassificaTutte = () => {
+    const doClassification = () => {
       setIsClassifying(true);
-      try {
-        const stats = await classificaTutteLeRighe();
-        console.log('[CategoriaFilter] Classificazione completata:', stats);
-        
-        await loadData();
-        
-        const message = `Classificate ${stats.righeClassificate} righe su ${stats.totaleRighe}`;
-        if (Platform.OS === 'web') {
-          window.alert(message);
-        } else {
+      
+      classificaTutteLeRighe()
+        .then((stats) => {
+          loadData();
+          const message = `Classificate ${stats.righeClassificate} righe su ${stats.totaleRighe}`;
           Alert.alert("Classificazione Completata", message);
-        }
-      } catch (error) {
-        console.error("[CategoriaFilter] Error classifying:", error);
-        const errorMessage = "Errore durante la classificazione";
-        if (Platform.OS === 'web') {
-          window.alert(errorMessage);
-        } else {
-          Alert.alert("Errore", errorMessage);
-        }
-      } finally {
-        setIsClassifying(false);
-      }
+        })
+        .catch((error) => {
+          console.error("Error classifying:", error);
+          Alert.alert("Errore", "Errore durante la classificazione");
+        })
+        .finally(() => {
+          setIsClassifying(false);
+        });
     };
 
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm("Classificare automaticamente tutte le righe esistenti?");
-      console.log('[CategoriaFilter] Conferma classificazione:', confirmed);
-      if (confirmed) {
-        await runClassification();
-      }
-    } else {
-      Alert.alert(
-        "Classifica Righe",
-        "Classificare automaticamente tutte le righe esistenti?",
-        [
-          { text: "Annulla", style: "cancel" },
-          { text: "Classifica", onPress: runClassification },
-        ]
-      );
-    }
+    Alert.alert(
+      "Classifica Righe",
+      "Classificare automaticamente tutte le righe esistenti?",
+      [
+        { text: "Annulla", style: "cancel" },
+        { text: "Classifica", onPress: doClassification },
+      ]
+    );
   };
 
   const filteredLines = lines.filter(line => {
