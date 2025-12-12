@@ -70,7 +70,19 @@ Ogni settore contiene 5 bancali: B1, B2, B3, B4, B5
 - **Navigazione**: React Navigation 7 (Bottom Tabs + Stack Navigators)
 - **Persistenza**: AsyncStorage per dati locali
 - **OCR**: Tesseract.js (solo web)
+- **Backup/Ripristino**: expo-file-system + expo-sharing per export/import dati
 - **UI**: Design iOS Liquid Glass con tema botanico professionale
+
+### Sistema Backup/Ripristino
+- **Esporta Backup**: Salva tutti i dati dell'app in un file JSON condivisibile
+- **Importa Backup**: Ripristina i dati da un file JSON di backup ProteaTrack
+- **Posizione**: Profilo → Backup e Ripristino
+- **Uso principale**: Trasferire dati tra app Replit (web) e Expo Go (iOS native)
+- **IMPORTANTE**: I dati in AsyncStorage sono isolati tra ambienti web e native
+  - App Replit usa localStorage/IndexedDB del browser
+  - Expo Go usa AsyncStorage nativo iOS
+  - Usare backup/ripristino per sincronizzare i dati tra ambienti
+- **File correlati**: `utils/backupService.ts`, `screens/ProfileScreen.tsx`
 
 ### Struttura File
 ```

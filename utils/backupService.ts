@@ -116,6 +116,10 @@ export const backupService = {
         };
       }
 
+      for (const key of ALL_STORAGE_KEYS) {
+        await AsyncStorage.removeItem(key);
+      }
+
       let itemsImported = 0;
       for (const [key, value] of Object.entries(backup.data)) {
         if (ALL_STORAGE_KEYS.includes(key)) {
@@ -126,7 +130,7 @@ export const backupService = {
 
       return { 
         success: true, 
-        message: `Importati ${itemsImported} archivi con successo`, 
+        message: `Importati ${itemsImported} archivi. Riavvia l'app per applicare le modifiche.`, 
         itemsImported 
       };
     } catch (error) {

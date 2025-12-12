@@ -11,6 +11,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { storage } from "@/utils/storage";
 import { clearImportedData } from "@/utils/debugTools";
+import { backupService } from "@/utils/backupService";
 import { UserSettings } from "@/types";
 import type { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 
@@ -26,6 +27,8 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     location: "",
   });
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [stats, setStats] = useState({
     totalPlants: 0,
     totalActivities: 0,
@@ -135,6 +138,57 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         ]
       );
     }
+  };
+
+  const handleExportBackup = async () => {
+    setExporting(true);
+    try {
+      const result = await backupService.exportAllData();
+      Alert.alert(
+        result.success ? "Esportazione Completata" : "Errore",
+        result.message
+      );
+    } catch (error) {
+      Alert.alert("Errore", "Impossibile esportare i dati");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImportBackup = () => {
+    const doImport = async () => {
+      setImporting(true);
+      try {
+        const result = await backupService.importData();
+        if (result.success) {
+          const statsData = await storage.getStats();
+          setStats({
+            totalPlants: statsData.totalPlants,
+            totalActivities: statsData.recentActivities.length,
+            benchesWithPlants: statsData.benchesWithPlants,
+          });
+          const savedSettings = await storage.getSettings();
+          setSettings(savedSettings);
+        }
+        Alert.alert(
+          result.success ? "Importazione Completata" : "Errore",
+          result.message
+        );
+      } catch (error) {
+        Alert.alert("Errore", "Impossibile importare i dati");
+      } finally {
+        setImporting(false);
+      }
+    };
+
+    Alert.alert(
+      "Importa Backup",
+      "I dati esistenti verranno sostituiti con quelli del backup. Continuare?",
+      [
+        { text: "Annulla", style: "cancel" },
+        { text: "Importa", onPress: doImport },
+      ]
+    );
   };
 
   const inputStyle = [
@@ -314,6 +368,50 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         <Feather name="settings" size={20} color="#FFFFFF" />
         <ThemedText style={styles.saveButtonText}>
           Configura Struttura Serre
+        </ThemedText>
+      </Pressable>
+
+      <Spacer height={Spacing["3xl"]} />
+
+      <ThemedText type="h4" style={styles.sectionTitle}>
+        Backup e Ripristino
+      </ThemedText>
+
+      <Spacer height={Spacing.lg} />
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.saveButton,
+          {
+            backgroundColor: theme.activityWatering,
+            opacity: pressed || exporting ? 0.8 : 1,
+          },
+        ]}
+        onPress={handleExportBackup}
+        disabled={exporting}
+      >
+        <Feather name="download" size={20} color="#FFFFFF" />
+        <ThemedText style={styles.saveButtonText}>
+          {exporting ? "Esportazione..." : "Esporta Backup"}
+        </ThemedText>
+      </Pressable>
+
+      <Spacer height={Spacing.lg} />
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.saveButton,
+          {
+            backgroundColor: theme.primary,
+            opacity: pressed || importing ? 0.8 : 1,
+          },
+        ]}
+        onPress={handleImportBackup}
+        disabled={importing}
+      >
+        <Feather name="upload" size={20} color="#FFFFFF" />
+        <ThemedText style={styles.saveButtonText}>
+          {importing ? "Importazione..." : "Importa Backup"}
         </ThemedText>
       </Pressable>
 
