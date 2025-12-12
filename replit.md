@@ -25,6 +25,7 @@ L'app è organizzata in 6 moduli principali accessibili tramite bottom tab navig
     - Collegato con "Piante Disponibili" in Colture (stessa fonte dati: PlantInventory)
     - Mostra: quantità totale, distribuite, disponibili per varietà
     - Solo articoli da categoria "Acquisto Piante" o "Semi"
+    - **CRUD completo**: Pulsante "+ Aggiungi" per nuove piante, modifica/elimina per varietà esistenti
   - **Materiali**: Vasi, terriccio, materiale vario, altro
     - Filtri per tipo (Tutti, Vasi, Terriccio, Materiali, Altro)
     - **Tendina per cambiare categoria**: premendo su un materiale si apre modale per riassegnare tipo
@@ -120,7 +121,7 @@ Ogni settore contiene 5 bancali: B1, B2, B3, B4, B5
 
   # Altro
   - ProfileScreen.tsx             # Impostazioni azienda
-  - CalendarScreen.tsx            # Vista calendario
+  - CalendarScreen.tsx            # Vista calendario unificata (tutti gli eventi)
 
 /navigation
   - MainTabNavigator.tsx          # Tab bar principale (6 tab)
@@ -145,6 +146,7 @@ Ogni settore contiene 5 bancali: B1, B2, B3, B4, B5
   - plantWarehouse.ts       # Gestione magazzino piante e distribuzioni
   - xmlImportService.ts     # Parser fatture XML FatturaPA
   - inventoryStore.ts       # Gestione inventario materiali
+  - eventAggregator.ts      # Aggregazione eventi calendario da tutti i moduli
 
 /types
   - index.ts          # FONTE UNICA per tipi e costanti (NON MODIFICARE)
@@ -211,6 +213,17 @@ npm run dev    # Avvia server Expo
 - Selezione multipla settori con pulsante "Seleziona Tutti"
 - **IMPORTANTE**: types/index.ts è la fonte unica per tipi e costanti - mai modificare o ridefinire altrove
 - Righe fattura importate vanno in Magazzino per revisione manuale prima di essere processate
+- Gestione inventario piante consolidata in Magazzino/Piante con CRUD completo
+
+### Sistema Calendario Unificato (EventAggregator)
+Il calendario mostra eventi unificati da tutti i moduli:
+- **Attività** (activity): Innaffiatura, concimazione, potatura, trattamenti, altro
+- **Trattamenti** (treatment): Trattamenti fitosanitari dal Quaderno di Campagna
+- **Transazioni** (transaction): Movimenti contabili (ricavi/costi)
+- **Arrivi piante** (plant_arrival): Arrivi piante da inventario e fatture importate
+
+Ogni tipo evento ha colore e icona distintivi per rapido riconoscimento.
+File correlati: `utils/eventAggregator.ts`, `screens/CalendarScreen.tsx`
 - Categorie materiali: piante, vasi, terriccio, fitofarmaco, fertilizzante, materiale, semi, utenza, altro
 
 ## Sistema Classificazione Automatica Righe Fattura
