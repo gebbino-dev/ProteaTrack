@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, StyleSheet, Alert, Platform, ScrollView, Pressable, Switch } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
+import { File as ExpoFile } from "expo-file-system";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { ScreenScrollView } from "@/components/ScreenScrollView";
@@ -129,7 +129,8 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
         const xmlContent = await response.text();
         processXml(xmlContent);
       } else {
-        const xmlContent = await FileSystem.readAsStringAsync(file.uri);
+        const expoFile = new ExpoFile(file.uri);
+        const xmlContent = await expoFile.text();
         processXml(xmlContent);
       }
     } catch (error) {
