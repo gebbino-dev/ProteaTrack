@@ -175,6 +175,30 @@ function parseParty(partyXml: string): InvoiceParty {
 
 const MY_VAT = "IT01747200473";
 
+const ENERGY_KEYWORDS = [
+  'enel', 'enel energia', 'e-distribuzione', 'servizio elettrico nazionale',
+  'gas', 'metano', 'energia elettrica', 'gas naturale',
+  'utenza luce', 'utenza gas', 'bolletta luce', 'bolletta gas',
+  'iren', 'hera', 'a2a', 'edison', 'eni gas', 'eni luce',
+  'sorgenia', 'acea', 'consumi energia', 'consumi gas',
+  'fornitura gas', 'fornitura energia', 'fornitura elettrica',
+  'e.on', 'eon', 'dolomiti energia', 'engie', 'illumia',
+  'estra', 'ascotrade', 'optima', 'wekiwi', 'plenitude',
+  'axpo', 'duferco', 'gelsia', 'se energia', 'bluenergy',
+  'consorzio agrario', 'gse', 'gestore servizi energetici',
+  'distribuzione energia', 'luce e gas', 'gas e luce',
+];
+
+function isEnergyInvoice(supplierName: string, combinedText: string): boolean {
+  const text = combinedText.toLowerCase();
+  const supplier = (supplierName || '').toLowerCase();
+
+  const hasEnergyWord = ENERGY_KEYWORDS.some(k => text.includes(k));
+  const supplierIsEnergy = ENERGY_KEYWORDS.some(k => supplier.includes(k));
+
+  return hasEnergyWord || supplierIsEnergy;
+}
+
 const REVENUE_KEYWORDS = [
   'conferimento fiori',
   'acconto conferimento',
@@ -314,13 +338,19 @@ export function parseInvoiceXml(xmlString: string): ParsedInvoice {
   
   const transactionType = determineTransactionType(tipoDocumento, xml);
   
+  const combinedText = `${causale || ''} ${lineItems.map(l => l.description).join(' ')}`;
+  const supplierName = supplier?.denomination || '';
+  const isEnergy = isEnergyInvoice(supplierName, combinedText);
+  
+  const effectiveLineItems = isEnergy ? [] : lineItems;
+  
   const datiPagamento = getTextContent(fatturaBody, 'DatiPagamento') || '';
   const paymentTerms = getTextContent(datiPagamento, 'ModalitaPagamento') || undefined;
   
   const transaction: Omit<Transaction, 'categoryId'> & { categoryId?: string } = {
     id: generateId(),
     type: transactionType,
-    categoryId: suggestCategory(lineItems, transactionType),
+    categoryId: isEnergy ? 'utenze' : suggestCategory(lineItems, transactionType),
     amount: totalAmount,
     date: data,
     counterparty: transactionType === 'costo' 
@@ -330,14 +360,14 @@ export function parseInvoiceXml(xmlString: string): ParsedInvoice {
     docRef: numero,
     docType: tipoDocumento,
     vatRate: mainVatRate,
-    notes: '',
+    notes: isEnergy ? 'Bolletta energia - solo totale importato' : '',
     source: 'import',
     createdAt: new Date().toISOString(),
   };
   
   return {
     transaction,
-    lineItems,
+    lineItems: effectiveLineItems,
     vatSummaries,
     supplier,
     customer,

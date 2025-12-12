@@ -1,0 +1,66 @@
+Per ottenere il comportamento che vuoi servono due regole distinte:  
+1) gestione speciale per fatture gas/luce;  
+2) esclusione delle fatture di incasso dal magazzino.  
+
+## 1. Fatture gas/luce: ignora righe, usa solo totali
+
+Chiedi al tuo agent di aggiungere una funzione di utilità, ad esempio in `xmlImportService.ts`:
+
+```ts
+function isEnergyInvoice(supplierName: string, combinedText: string): boolean {
+  const text = combinedText.toLowerCase();
+  const supplier = (supplierName || '').toLowerCase();
+
+  const energyKeywords = ['enel', 'enel energia', 'e-distribuzione', 'gas', 'metano', 'energia elettrica', 'utenza luce', 'utenza gas'];
+
+  const hasEnergyWord = energyKeywords.some(k => text.includes(k));
+  const supplierIsEnergy = energyKeywords.some(k => supplier.includes(k));
+
+  return hasEnergyWord || supplierIsEnergy;
+}
+```
+
+Poi, in `parseInvoiceXml` dopo aver calcolato `transactionType`, fai:
+
+```ts
+const combinedText = `${causale || ''} ${dettaglioLineeElements
+  .map(lineXml => getTextContent(lineXml, 'Descrizione') || '')
+  .join(' ')}`;
+
+const supplierName = supplier?.denomination || '';
+
+const energy = isEnergyInvoice(supplierName, combinedText);
+
+// Se è fattura gas/luce: non creare lineItems di magazzino, ma lascia solo i totali
+const effectiveLineItems = energy ? [] : lineItems;
+```
+
+E nel `return` di `parseInvoiceXml` usa `effectiveLineItems` al posto di `lineItems`. Così:  
+- le fatture di energia vanno in contabilità con il totale;  
+- nessuna loro riga finisce nel magazzino.[1][2]
+
+## 2. Escludere le fatture di incasso dal magazzino
+
+Qui conviene usare la logica che già distingue `TransactionType` o parole chiave. Fai aggiungere in `determineTransactionType` qualcosa tipo:
+
+```ts
+if (containsRevenueKeywords(combinedText)) {
+  // ricavi da vendite floratoscana: marcali come 'incasso'
+  return 'incasso';
+}
+```
+
+(oppure introduci un nuovo tipo `TransactionType = 'costo' | 'ricavo' | 'incasso'` se non c’è già.)
+
+Poi, nella funzione `importInvoiceToPending` che crea le `PendingInvoiceLine`, aggiungi all’inizio:
+
+```ts
+if (parsed.transaction.type === 'incasso') {
+  // non mandare queste fatture al magazzino
+  return;
+}
+```
+
+In questo modo:  
+- le fatture di incasso restano solo nell’area “Contabilità” (dove già salvi `transaction`),  
+- il magazzino contiene solo costi materiali/utenze utili per lo stock.[3][4]

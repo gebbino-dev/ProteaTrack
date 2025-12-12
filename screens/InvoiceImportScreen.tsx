@@ -198,6 +198,16 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
         
         await inventoryStore.addTransaction(parsed, categoryId);
         
+        if (parsed.transaction.type === 'ricavo') {
+          results.push({
+            fileName,
+            success: true,
+            invoiceNumber: parsed.documentNumber,
+            linesImported: 0,
+          });
+          continue;
+        }
+        
         const { classificaRiga } = await import('@/utils/autoCategorizationService');
         const items = extractInventoryItems(parsed);
         

@@ -5,8 +5,17 @@ import { classificaRiga } from '../utils/autoCategorizationService';
 export async function importInvoiceToPending(xmlString: string): Promise<{ 
   parsed: ParsedInvoice; 
   linesImported: number;
+  skippedReason?: string;
 }> {
   const parsed = parseInvoiceXml(xmlString);
+
+  if (parsed.transaction.type === 'ricavo') {
+    return {
+      parsed,
+      linesImported: 0,
+      skippedReason: 'Fattura di incasso - non inviata al magazzino',
+    };
+  }
 
   const pendingLinesInput = parsed.lineItems.map(line => {
     const categ = classificaRiga(line.description);
