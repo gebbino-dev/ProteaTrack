@@ -79,27 +79,38 @@ export default function CategoriaFilterScreen({ navigation }: CategoriaFilterScr
 
   const handleClassificaTutte = async () => {
     const runClassification = async () => {
+      console.log('[CategoriaFilter] Avvio classificazione...');
       setIsClassifying(true);
       try {
         const stats = await classificaTutteLeRighe();
-        loadData();
+        console.log('[CategoriaFilter] Classificazione completata:', stats);
+        
+        await loadData();
         
         const message = `Classificate ${stats.righeClassificate} righe su ${stats.totaleRighe}`;
         if (Platform.OS === 'web') {
-          alert(message);
+          window.alert(message);
         } else {
           Alert.alert("Classificazione Completata", message);
         }
       } catch (error) {
-        console.error("Error classifying:", error);
+        console.error("[CategoriaFilter] Error classifying:", error);
+        const errorMessage = "Errore durante la classificazione";
+        if (Platform.OS === 'web') {
+          window.alert(errorMessage);
+        } else {
+          Alert.alert("Errore", errorMessage);
+        }
       } finally {
         setIsClassifying(false);
       }
     };
 
     if (Platform.OS === 'web') {
-      if (confirm("Classificare automaticamente tutte le righe esistenti?")) {
-        runClassification();
+      const confirmed = window.confirm("Classificare automaticamente tutte le righe esistenti?");
+      console.log('[CategoriaFilter] Conferma classificazione:', confirmed);
+      if (confirmed) {
+        await runClassification();
       }
     } else {
       Alert.alert(
