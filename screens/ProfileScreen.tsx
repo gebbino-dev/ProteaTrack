@@ -12,6 +12,7 @@ import { Spacing, BorderRadius, Typography } from "@/constants/theme";
 import { storage } from "@/utils/storage";
 import { clearImportedData } from "@/utils/debugTools";
 import { backupService } from "@/utils/backupService";
+import { storageDebug } from "@/utils/storageDebug";
 import { UserSettings } from "@/types";
 import type { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 
@@ -29,6 +30,13 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<{
+    pendingLines: number;
+    transactions: number;
+    activities: number;
+    benches: number;
+    treatments: number;
+  } | null>(null);
   const [stats, setStats] = useState({
     totalPlants: 0,
     totalActivities: 0,
@@ -38,9 +46,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   useFocusEffect(
     useCallback(() => {
       const loadData = async () => {
-        const [savedSettings, statsData] = await Promise.all([
+        const [savedSettings, statsData, debugData] = await Promise.all([
           storage.getSettings(),
           storage.getStats(),
+          storageDebug.checkDataExists(),
         ]);
         setSettings(savedSettings);
         setStats({
@@ -48,6 +57,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           totalActivities: statsData.recentActivities.length,
           benchesWithPlants: statsData.benchesWithPlants,
         });
+        setDebugInfo(debugData);
       };
       loadData();
     }, [])
@@ -189,6 +199,44 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         { text: "Importa", onPress: doImport },
       ]
     );
+  };
+
+  const handleTestStorage = async () => {
+    try {
+      const testResult = await storageDebug.testPersistence();
+      const dataCheck = await storageDebug.checkDataExists();
+      setDebugInfo(dataCheck);
+      
+      const message = [
+        `Scrittura: ${testResult.canWrite ? 'OK' : 'FALLITA'}`,
+        `Lettura: ${testResult.canRead ? 'OK' : 'FALLITA'}`,
+        `Verifica: ${testResult.valueMatches ? 'OK' : 'FALLITA'}`,
+        '',
+        'Dati in memoria:',
+        `- Righe fattura: ${dataCheck.pendingLines}`,
+        `- Transazioni: ${dataCheck.transactions}`,
+        `- Attivita: ${dataCheck.activities}`,
+        `- Bancali: ${dataCheck.benches}`,
+        `- Trattamenti: ${dataCheck.treatments}`,
+      ].join('\n');
+      
+      Alert.alert('Test Storage', message);
+    } catch (error) {
+      Alert.alert('Errore', `Test fallito: ${error}`);
+    }
+  };
+
+  const handleDumpStorage = async () => {
+    try {
+      await storageDebug.logAllData();
+      const stats = await storageDebug.getStorageStats();
+      Alert.alert(
+        'Storage Dump', 
+        `Totale chiavi: ${stats.totalKeys}\n\nChiavi: ${stats.keys.join(', ')}\n\n(Controlla la console per dettagli)`
+      );
+    } catch (error) {
+      Alert.alert('Errore', `Dump fallito: ${error}`);
+    }
   };
 
   const inputStyle = [
@@ -459,13 +507,82 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         </ThemedText>
       </Pressable>
 
+      <Spacer height={Spacing["3xl"]} />
+
+      <ThemedText type="h4" style={styles.sectionTitle}>
+        Diagnostica Storage
+      </ThemedText>
+
+      <Spacer height={Spacing.lg} />
+
+      {debugInfo ? (
+        <View style={[styles.debugCard, { backgroundColor: theme.backgroundDefault }]}>
+          <View style={styles.debugRow}>
+            <ThemedText style={{ color: theme.textSecondary }}>Righe fattura:</ThemedText>
+            <ThemedText style={{ fontWeight: '600' }}>{debugInfo.pendingLines}</ThemedText>
+          </View>
+          <View style={styles.debugRow}>
+            <ThemedText style={{ color: theme.textSecondary }}>Transazioni:</ThemedText>
+            <ThemedText style={{ fontWeight: '600' }}>{debugInfo.transactions}</ThemedText>
+          </View>
+          <View style={styles.debugRow}>
+            <ThemedText style={{ color: theme.textSecondary }}>Attivita:</ThemedText>
+            <ThemedText style={{ fontWeight: '600' }}>{debugInfo.activities}</ThemedText>
+          </View>
+          <View style={styles.debugRow}>
+            <ThemedText style={{ color: theme.textSecondary }}>Bancali:</ThemedText>
+            <ThemedText style={{ fontWeight: '600' }}>{debugInfo.benches}</ThemedText>
+          </View>
+          <View style={styles.debugRow}>
+            <ThemedText style={{ color: theme.textSecondary }}>Trattamenti:</ThemedText>
+            <ThemedText style={{ fontWeight: '600' }}>{debugInfo.treatments}</ThemedText>
+          </View>
+        </View>
+      ) : null}
+
+      <Spacer height={Spacing.lg} />
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.saveButton,
+          {
+            backgroundColor: '#FF9800',
+            opacity: pressed ? 0.8 : 1,
+          },
+        ]}
+        onPress={handleTestStorage}
+      >
+        <Feather name="activity" size={20} color="#FFFFFF" />
+        <ThemedText style={styles.saveButtonText}>
+          Test Persistenza Storage
+        </ThemedText>
+      </Pressable>
+
+      <Spacer height={Spacing.lg} />
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.saveButton,
+          {
+            backgroundColor: theme.textSecondary,
+            opacity: pressed ? 0.8 : 1,
+          },
+        ]}
+        onPress={handleDumpStorage}
+      >
+        <Feather name="terminal" size={20} color="#FFFFFF" />
+        <ThemedText style={styles.saveButtonText}>
+          Mostra Chiavi Storage
+        </ThemedText>
+      </Pressable>
+
       <Spacer height={Spacing["2xl"]} />
 
       <View style={[styles.infoCard, { backgroundColor: theme.backgroundDefault }]}>
         <Feather name="info" size={20} color={theme.textSecondary} />
         <View style={styles.infoText}>
           <ThemedText style={{ color: theme.textSecondary, fontSize: 14 }}>
-            SerraManager v1.0.0
+            ProteaTrack v1.0.0
           </ThemedText>
           <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
             Gestione serre per coltivazione Proteaceae
@@ -547,5 +664,15 @@ const styles = StyleSheet.create({
   },
   infoText: {
     flex: 1,
+  },
+  debugCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
+  },
+  debugRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 });
