@@ -65,7 +65,10 @@ const FITOFARMACI_COMMERCIALI = [
 export function classificaRiga(descrizione: string): CategorizzazioneResult {
   const desc = descrizione.toLowerCase().trim();
   
-  if (desc.includes('floratoscana') || 
+  // Regole specifiche Flora Toscana (priorità massima)
+  if (desc.includes('fondo sviluppo soci') || 
+      desc.includes('detrazione costo di servizio conf.fiori') ||
+      desc.includes('floratoscana') || 
       desc.includes('flora toscana') || 
       (desc.includes('spese accessorie') && desc.includes('flora'))) {
     return { categoria: 'utenze', sottoCategoriaUtenza: 'spese_floratoscana' };
