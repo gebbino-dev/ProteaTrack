@@ -1,4 +1,4 @@
-import { pendingInvoiceStore, PendingInvoiceLine } from './pendingInvoiceStore';
+import { pendingInvoiceStore, PendingInvoiceLine, ItemCategory } from './pendingInvoiceStore';
 
 export type CategoriaRiga = 
   | 'utenze'
@@ -10,6 +10,19 @@ export type CategoriaRiga =
   | 'fertilizzanti'
   | 'combustibile'
   | 'materiale_generico';
+
+// Mappa CategoriaRiga -> ItemCategory per compatibilita con pendingInvoiceStore
+const CATEGORIA_TO_ITEM_CATEGORY: Record<CategoriaRiga, ItemCategory> = {
+  'utenze': 'utenza',
+  'piante': 'piante',
+  'semi': 'semi',
+  'terriccio': 'terriccio',
+  'vasi': 'vasi',
+  'fitofarmaci': 'fitofarmaco',
+  'fertilizzanti': 'fertilizzante',
+  'combustibile': 'altro',
+  'materiale_generico': 'materiale',
+};
 
 export type SottoCategoriaUtenza = 
   | 'spese_floratoscana'
@@ -227,10 +240,16 @@ export async function classificaTutteLeRighe(): Promise<ClassificazioneStats> {
   for (const line of lines) {
     const result = classificaRiga(line.description);
     
+    // Mappa alla categoria corretta per pendingInvoiceStore
+    const itemCategory = CATEGORIA_TO_ITEM_CATEGORY[result.categoria];
+    
+    // Aggiorna TUTTI i campi categoria per compatibilita con entrambe le schermate
     await pendingInvoiceStore.updateLine(line.id, {
+      assignedCategory: itemCategory,
+      detectedCategory: itemCategory,
       categoria: result.categoria,
       sottoCategoriaUtenza: result.sottoCategoriaUtenza,
-    } as Partial<PendingInvoiceLine>);
+    });
     
     stats.righeClassificate++;
     stats.perCategoria[result.categoria]++;

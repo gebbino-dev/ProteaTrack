@@ -9,6 +9,7 @@ import LavoroStackNavigator from "@/navigation/LavoroStackNavigator";
 import NotebookStackNavigator from "@/navigation/NotebookStackNavigator";
 import AccountingStackNavigator from "@/navigation/AccountingStackNavigator";
 import ReportStackNavigator from "@/navigation/ReportStackNavigator";
+import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
 
 export type MainTabParamList = {
@@ -18,6 +19,7 @@ export type MainTabParamList = {
   QuadernoTab: undefined;
   ContabilitaTab: undefined;
   ReportTab: undefined;
+  ProfileTab: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -111,6 +113,16 @@ export default function MainTabNavigator() {
           title: "Report",
           tabBarIcon: ({ color, size }) => (
             <Feather name="bar-chart-2" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="ProfileTab"
+        component={ProfileStackNavigator}
+        options={{
+          title: "Profilo",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="user" size={size} color={color} />
           ),
         }}
       />
