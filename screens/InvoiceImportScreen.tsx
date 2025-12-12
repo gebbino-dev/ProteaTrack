@@ -44,12 +44,22 @@ type InvoiceImportScreenProps = {
   navigation: NativeStackNavigationProp<AccountingStackParamList, "InvoiceImport">;
 };
 
+interface BatchImportResult {
+  fileName: string;
+  success: boolean;
+  invoiceNumber?: string;
+  linesImported?: number;
+  error?: string;
+}
+
 export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenProps) {
   const { theme } = useTheme();
   const [parsedInvoice, setParsedInvoice] = useState<ParsedInvoice | null>(null);
   const [inventoryItems, setInventoryItems] = useState<InventoryImportItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [batchResults, setBatchResults] = useState<BatchImportResult[]>([]);
+  const [isBatchMode, setIsBatchMode] = useState(false);
 
   const handleResetAllData = async () => {
     Alert.alert(
@@ -112,9 +122,15 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
   const pickDocument = async () => {
     try {
       setLoading(true);
+      setBatchResults([]);
+      setIsBatchMode(false);
+      setParsedInvoice(null);
+      setInventoryItems([]);
+      
       const result = await DocumentPicker.getDocumentAsync({
         type: ["text/xml", "application/xml", "*/*"],
         copyToCacheDirectory: true,
+        multiple: true,
       });
 
       if (result.canceled || !result.assets || result.assets.length === 0) {
@@ -122,23 +138,119 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
         return;
       }
 
-      const file = result.assets[0];
-      
-      if (Platform.OS === "web") {
-        const response = await fetch(file.uri);
-        const xmlContent = await response.text();
-        processXml(xmlContent);
+      if (result.assets.length === 1) {
+        const file = result.assets[0];
+        if (Platform.OS === "web") {
+          const response = await fetch(file.uri);
+          const xmlContent = await response.text();
+          processXml(xmlContent);
+        } else {
+          const expoFile = new ExpoFile(file.uri);
+          const xmlContent = await expoFile.text();
+          processXml(xmlContent);
+        }
       } else {
-        const expoFile = new ExpoFile(file.uri);
-        const xmlContent = await expoFile.text();
-        processXml(xmlContent);
+        setIsBatchMode(true);
+        await processBatchImport(result.assets);
       }
     } catch (error) {
       console.error("Error picking document:", error);
-      Alert.alert("Errore", "Impossibile leggere il file selezionato");
+      Alert.alert("Errore", "Impossibile leggere i file selezionati");
     } finally {
       setLoading(false);
     }
+  };
+
+  const processBatchImport = async (files: DocumentPicker.DocumentPickerAsset[]) => {
+    const results: BatchImportResult[] = [];
+    
+    for (const file of files) {
+      const fileName = file.name || `File ${results.length + 1}`;
+      
+      try {
+        let xmlContent: string;
+        
+        if (Platform.OS === "web") {
+          const response = await fetch(file.uri);
+          xmlContent = await response.text();
+        } else {
+          const expoFile = new ExpoFile(file.uri);
+          xmlContent = await expoFile.text();
+        }
+        
+        const parsed = parseInvoiceXml(xmlContent);
+        
+        const duplicateCheck = await inventoryStore.checkDuplicateInvoice(parsed);
+        if (duplicateCheck.isDuplicate) {
+          results.push({
+            fileName,
+            success: false,
+            invoiceNumber: parsed.documentNumber,
+            error: "Fattura duplicata",
+          });
+          continue;
+        }
+        
+        const categories = parsed.transaction.type === "costo" 
+          ? DEFAULT_EXPENSE_CATEGORIES 
+          : DEFAULT_REVENUE_CATEGORIES;
+        const categoryId = categories[0].id;
+        
+        await inventoryStore.addTransaction(parsed, categoryId);
+        
+        const { classificaRiga } = await import('@/utils/autoCategorizationService');
+        const items = extractInventoryItems(parsed);
+        
+        if (items.length > 0) {
+          const pendingLines = items.map(item => {
+            const categ = classificaRiga(item.description);
+            return {
+              invoiceNumber: `FT ${parsed.documentNumber}`,
+              invoiceDate: parsed.documentDate,
+              supplierName: parsed.supplier?.denomination || 'Fornitore',
+              lineNumber: item.lineNumber,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.quantity * item.unitPrice,
+              unitOfMeasure: item.unitOfMeasure,
+              vatRate: undefined,
+              detectedCategory: (item.itemType || 'altro') as ItemCategory,
+              assignedCategory: (item.itemType || 'altro') as ItemCategory,
+              categoria: categ.categoria,
+              sottoCategoriaUtenza: categ.sottoCategoriaUtenza,
+              isProcessed: false,
+            };
+          });
+          
+          await pendingInvoiceStore.savePendingLines(pendingLines);
+          
+          results.push({
+            fileName,
+            success: true,
+            invoiceNumber: parsed.documentNumber,
+            linesImported: pendingLines.length,
+          });
+        } else {
+          results.push({
+            fileName,
+            success: true,
+            invoiceNumber: parsed.documentNumber,
+            linesImported: 0,
+          });
+        }
+        
+      } catch (error) {
+        console.error(`Error processing ${fileName}:`, error);
+        results.push({
+          fileName,
+          success: false,
+          error: error instanceof Error ? error.message : "Errore sconosciuto",
+        });
+      }
+    }
+    
+    setBatchResults(results);
   };
 
   const processXml = (xmlContent: string) => {
@@ -309,7 +421,7 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
         <ThemedText type="h2">Importa Fattura XML</ThemedText>
         <Spacer height={Spacing.sm} />
         <ThemedText style={{ color: theme.textSecondary }}>
-          Seleziona un file XML di fattura elettronica italiana (formato SDI)
+          Seleziona uno o piu file XML di fattura elettronica italiana (formato SDI)
         </ThemedText>
         
         <Spacer height={Spacing.xl} />
@@ -365,6 +477,100 @@ export default function InvoiceImportScreen({ navigation }: InvoiceImportScreenP
             </Pressable>
           </View>
         </Card>
+
+        {isBatchMode && batchResults.length > 0 ? (
+          <>
+            <Spacer height={Spacing["2xl"]} />
+            
+            <Card>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.md }}>
+                <Feather name="layers" size={20} color={theme.primary} />
+                <ThemedText type="h3" style={{ marginLeft: Spacing.sm }}>
+                  Importazione Multipla
+                </ThemedText>
+              </View>
+              
+              <View style={{ 
+                flexDirection: "row", 
+                justifyContent: "space-around", 
+                marginBottom: Spacing.lg,
+                paddingVertical: Spacing.md,
+                backgroundColor: theme.backgroundSecondary,
+                borderRadius: BorderRadius.md,
+              }}>
+                <View style={{ alignItems: "center" }}>
+                  <ThemedText style={{ fontSize: 24, fontWeight: "700", color: "#4CAF50" }}>
+                    {batchResults.filter(r => r.success).length}
+                  </ThemedText>
+                  <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+                    Importate
+                  </ThemedText>
+                </View>
+                <View style={{ alignItems: "center" }}>
+                  <ThemedText style={{ fontSize: 24, fontWeight: "700", color: "#F44336" }}>
+                    {batchResults.filter(r => !r.success).length}
+                  </ThemedText>
+                  <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+                    Errori
+                  </ThemedText>
+                </View>
+                <View style={{ alignItems: "center" }}>
+                  <ThemedText style={{ fontSize: 24, fontWeight: "700", color: theme.primary }}>
+                    {batchResults.reduce((sum, r) => sum + (r.linesImported || 0), 0)}
+                  </ThemedText>
+                  <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+                    Righe
+                  </ThemedText>
+                </View>
+              </View>
+              
+              {batchResults.map((result, index) => (
+                <View 
+                  key={index}
+                  style={{ 
+                    flexDirection: "row", 
+                    alignItems: "center",
+                    paddingVertical: Spacing.sm,
+                    borderTopWidth: index > 0 ? 1 : 0,
+                    borderTopColor: theme.backgroundSecondary,
+                  }}
+                >
+                  <Feather 
+                    name={result.success ? "check-circle" : "x-circle"} 
+                    size={18} 
+                    color={result.success ? "#4CAF50" : "#F44336"} 
+                  />
+                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                    <ThemedText numberOfLines={1} style={{ fontWeight: "500" }}>
+                      {result.invoiceNumber || result.fileName}
+                    </ThemedText>
+                    {result.success ? (
+                      <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
+                        {result.linesImported} righe importate
+                      </ThemedText>
+                    ) : (
+                      <ThemedText style={{ color: "#F44336", fontSize: 12 }}>
+                        {result.error}
+                      </ThemedText>
+                    )}
+                  </View>
+                </View>
+              ))}
+              
+              <Spacer height={Spacing.lg} />
+              
+              <Pressable
+                style={[styles.primaryButton, { backgroundColor: theme.primary }]}
+                onPress={() => navigation.goBack()}
+              >
+                <Feather name="check" size={18} color="#FFFFFF" style={{ marginRight: Spacing.sm }} />
+                <ThemedText style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                  Fatto
+                </ThemedText>
+              </Pressable>
+            </Card>
+          </>
+        ) : null}
 
         {parsedInvoice ? (
           <>
