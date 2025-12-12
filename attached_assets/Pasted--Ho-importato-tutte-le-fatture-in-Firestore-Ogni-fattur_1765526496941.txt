@@ -1,0 +1,45 @@
+> Ho importato tutte le fatture in Firestore.  
+> Ogni fattura ha delle **righe** (line items) con una descrizione testuale.  
+> 
+> Obiettivo: voglio **assegnare automaticamente una categoria** a ogni riga, senza dover aprire le fatture una per una.  
+> 
+> 1. Aggiungi ai documenti delle righe di fattura due campi:  
+>    - `categoria` (stringa)  
+>    - `sottoCategoriaUtenza` (stringa opzionale, può essere vuota o assente).  
+> 
+> 2. Scrivi una funzione (o script una tantum) che:  
+>    - legge tutte le righe di tutte le fatture già importate.  
+>    - per ogni riga prende la descrizione (la metti in minuscolo).  
+>    - applica **regole a parole chiave** per impostare `categoria` e `sottoCategoriaUtenza`.  
+> 
+> 3. Regole di classificazione (in ordine di priorità, fermandosi alla prima che scatta):  
+>    - Se la descrizione contiene parole chiave di **utenze e spese accessorie**:  
+>      - se contiene “floratoscana” (anche varianti tipo “flora toscana”, “spese accessorie floratoscana”)  
+>        → `categoria = "utenze"`, `sottoCategoriaUtenza = "spese_floratoscana"`.  
+>      - se contiene “energia elettrica”, “enel”, “kwh”, “elettrica”, “corrente”  
+>        → `categoria = "utenze"`, `sottoCategoriaUtenza = "luce"`.  
+>      - se contiene “metano”, “gas”, “gpl” (quando indicano chiaramente bollette)  
+>        → `categoria = "utenze"`, `sottoCategoriaUtenza = "gas"`.  
+>      - se contiene “cia”, “confederazione italiana agricoltori”  
+>        → `categoria = "utenze"`, `sottoCategoriaUtenza = "spese_cia"`.  
+>    - Altrimenti, se contiene parole di:  
+>      - **piante**: “protea”, “leucospermum”, “serruria”, “telopea”, “pianta”, “piante”, “piantine”  
+>        → `categoria = "piante"`.  
+>      - **semi**: “seme”, “semi”, “seeds” → `categoria = "semi"`.  
+>      - **terriccio**: “terriccio”, “substrato”, “torba” → `categoria = "terriccio"`.  
+>      - **vasi**: “vaso”, “vasi”, “contenitore”, “plateau”, “alveolare” → `categoria = "vasi"`.  
+>      - **fitofarmaci**: “fitofarmaco”, “agrofarmaco”, “fungicida”, “insetticida”, nomi commerciali dei prodotti fitosanitari → `categoria = "fitofarmaci"`.  
+>      - **fertilizzanti**: “concime”, “fertilizzante”, “npk”, “stallatico” → `categoria = "fertilizzanti"`.  
+>      - **combustibile**: “gasolio”, “gasoil”, “gasolio agricolo”, “gpl” (come carburante), “pellet” → `categoria = "combustibile"`.  
+>    - Se nessuna regola si applica → `categoria = "materiale_generico"` e `sottoCategoriaUtenza` vuoto.  
+> 
+> 4. Questa funzione deve poter essere lanciata:  
+>    - una volta subito adesso per **tutte le righe già esistenti** (batch update).  
+>    - in automatico per ogni nuova fattura importata (al momento del salvataggio delle righe).  
+> 
+> 5. Non cambiare la struttura delle fatture o della parte contabile:  
+>    - aggiungi solo questi campi di categoria alle righe e scrivi la logica di assegnazione in un punto centrale che useremo sia per vecchie sia per nuove fatture.  
+> 
+> 6. Fammi anche una pagina / filtro nella UI dove posso vedere:  
+>    - l’elenco delle righe filtrabile per `categoria`.  
+>    - in particolare un filtro rapido per vedere tutte le righe con `categoria = "utenze"` e il dettaglio `sottoCategoriaUtenza`.

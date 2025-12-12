@@ -200,3 +200,27 @@ npm run dev    # Avvia server Expo
 - **IMPORTANTE**: types/index.ts è la fonte unica per tipi e costanti - mai modificare o ridefinire altrove
 - Righe fattura importate vanno in Magazzino per revisione manuale prima di essere processate
 - Categorie materiali: piante, vasi, terriccio, fitofarmaco, fertilizzante, materiale, semi, utenza, altro
+
+## Sistema Classificazione Automatica Righe Fattura
+
+### Categorie Disponibili (CategoriaRiga)
+- `utenze` - con sottocategorie: spese_floratoscana, luce, gas, spese_cia
+- `piante` - protea, leucospermum, serruria, telopea, etc.
+- `semi` - seme, semi, seeds
+- `terriccio` - terriccio, substrato, torba, perlite
+- `vasi` - vaso, vasi, contenitore, plateau, alveolare
+- `fitofarmaci` - fitofarmaco, fungicida, insetticida, nomi commerciali
+- `fertilizzanti` - concime, fertilizzante, npk, stallatico
+- `combustibile` - gasolio, gpl, pellet, legna
+- `materiale_generico` - fallback per righe non classificate
+
+### Funzionalità
+1. **Classificazione automatica all'import**: ogni riga fattura viene classificata automaticamente
+2. **Batch update**: pulsante "Classifica Tutto" per reclassificare tutte le righe esistenti
+3. **Filtri UI**: schermata dedicata con filtri per categoria e sottocategoria utenza
+4. **Dettaglio utenze**: filtro rapido per sottocategorie (spese floratoscana, luce, gas, CIA)
+
+### File Correlati
+- `utils/autoCategorizationService.ts` - funzione `classificaRiga()` e batch update
+- `screens/CategoriaFilterScreen.tsx` - UI filtri per categoria
+- `utils/pendingInvoiceStore.ts` - campi `categoria` e `sottoCategoriaUtenza`

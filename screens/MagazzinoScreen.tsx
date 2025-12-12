@@ -343,6 +343,18 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
           </Pressable>
         </View>
 
+        <Spacer height={Spacing.md} />
+        <Pressable
+          style={[styles.filterButton, { backgroundColor: theme.primary + '15' }]}
+          onPress={() => navigation.navigate('CategoriaFilter')}
+        >
+          <Feather name="filter" size={18} color={theme.primary} />
+          <ThemedText style={{ flex: 1, marginLeft: Spacing.sm, color: theme.primary }}>
+            Filtra righe per categoria
+          </ThemedText>
+          <Feather name="chevron-right" size={20} color={theme.primary} />
+        </Pressable>
+
         {pendingLines.length > 0 ? (
           <>
             <Spacer height={Spacing.md} />
@@ -788,6 +800,12 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
   },
   sectionTitle: {
     marginBottom: Spacing.xs,

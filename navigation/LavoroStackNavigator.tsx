@@ -4,6 +4,7 @@ import MagazzinoScreen from "@/screens/MagazzinoScreen";
 import RecordActivityScreen from "@/screens/RecordActivityScreen";
 import ActivityDetailScreen from "@/screens/ActivityDetailScreen";
 import EditActivityScreen from "@/screens/EditActivityScreen";
+import CategoriaFilterScreen from "@/screens/CategoriaFilterScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
 import { getCommonScreenOptions } from "@/navigation/screenOptions";
@@ -17,6 +18,7 @@ export type LavoroStackParamList = {
   } | undefined;
   ActivityDetail: { activityId: string };
   EditActivity: { activityId: string };
+  CategoriaFilter: undefined;
 };
 
 const Stack = createNativeStackNavigator<LavoroStackParamList>();
@@ -58,6 +60,13 @@ export default function LavoroStackNavigator() {
         options={{
           headerTitle: "Modifica Attività",
           presentation: "modal",
+        }}
+      />
+      <Stack.Screen
+        name="CategoriaFilter"
+        component={CategoriaFilterScreen}
+        options={{
+          headerTitle: "Filtra per Categoria",
         }}
       />
     </Stack.Navigator>

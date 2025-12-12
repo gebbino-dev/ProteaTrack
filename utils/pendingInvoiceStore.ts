@@ -7,6 +7,24 @@ const KEYS = {
 
 export type ItemCategory = 'piante' | 'vasi' | 'terriccio' | 'fitofarmaco' | 'fertilizzante' | 'materiale' | 'semi' | 'utenza' | 'altro';
 
+export type CategoriaRiga = 
+  | 'utenze'
+  | 'piante'
+  | 'semi'
+  | 'terriccio'
+  | 'vasi'
+  | 'fitofarmaci'
+  | 'fertilizzanti'
+  | 'combustibile'
+  | 'materiale_generico';
+
+export type SottoCategoriaUtenza = 
+  | 'spese_floratoscana'
+  | 'luce'
+  | 'gas'
+  | 'spese_cia'
+  | '';
+
 export interface PendingInvoiceLine {
   id: string;
   invoiceNumber: string;
@@ -21,6 +39,8 @@ export interface PendingInvoiceLine {
   vatRate?: number;
   detectedCategory: ItemCategory;
   assignedCategory: ItemCategory;
+  categoria: CategoriaRiga;
+  sottoCategoriaUtenza: SottoCategoriaUtenza;
   isProcessed: boolean;
   processedAt?: string;
   createdAt: string;
@@ -165,5 +185,69 @@ export const pendingInvoiceStore = {
         ...data,
       }))
       .filter(s => s.count > 0);
+  },
+
+  async getLinesByCategoria(categoria: CategoriaRiga): Promise<PendingInvoiceLine[]> {
+    const lines = await this.getPendingLines();
+    return lines.filter(l => l.categoria === categoria);
+  },
+
+  async getLinesBySottoCategoriaUtenza(sottocategoria: SottoCategoriaUtenza): Promise<PendingInvoiceLine[]> {
+    const lines = await this.getPendingLines();
+    return lines.filter(l => l.sottoCategoriaUtenza === sottocategoria);
+  },
+
+  async getCategoriaSummary(): Promise<{ categoria: CategoriaRiga; count: number; total: number }[]> {
+    const lines = await this.getPendingLines();
+    const summary: Record<CategoriaRiga, { count: number; total: number }> = {
+      utenze: { count: 0, total: 0 },
+      piante: { count: 0, total: 0 },
+      semi: { count: 0, total: 0 },
+      terriccio: { count: 0, total: 0 },
+      vasi: { count: 0, total: 0 },
+      fitofarmaci: { count: 0, total: 0 },
+      fertilizzanti: { count: 0, total: 0 },
+      combustibile: { count: 0, total: 0 },
+      materiale_generico: { count: 0, total: 0 },
+    };
+
+    for (const line of lines) {
+      const cat = line.categoria || 'materiale_generico';
+      summary[cat].count++;
+      summary[cat].total += line.totalPrice;
+    }
+
+    return Object.entries(summary)
+      .map(([categoria, data]) => ({
+        categoria: categoria as CategoriaRiga,
+        ...data,
+      }))
+      .filter(s => s.count > 0)
+      .sort((a, b) => b.total - a.total);
+  },
+
+  async getSottocategoriaUtenzaSummary(): Promise<{ sottocategoria: SottoCategoriaUtenza; count: number; total: number }[]> {
+    const utenzeLines = await this.getLinesByCategoria('utenze');
+    const summary: Record<SottoCategoriaUtenza, { count: number; total: number }> = {
+      'spese_floratoscana': { count: 0, total: 0 },
+      'luce': { count: 0, total: 0 },
+      'gas': { count: 0, total: 0 },
+      'spese_cia': { count: 0, total: 0 },
+      '': { count: 0, total: 0 },
+    };
+
+    for (const line of utenzeLines) {
+      const sub = line.sottoCategoriaUtenza || '';
+      summary[sub].count++;
+      summary[sub].total += line.totalPrice;
+    }
+
+    return Object.entries(summary)
+      .map(([sottocategoria, data]) => ({
+        sottocategoria: sottocategoria as SottoCategoriaUtenza,
+        ...data,
+      }))
+      .filter(s => s.count > 0)
+      .sort((a, b) => b.total - a.total);
   },
 };

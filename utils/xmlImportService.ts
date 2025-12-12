@@ -1,4 +1,5 @@
 import { Transaction, TransactionType, PlantRecord } from "@/types";
+import { classificaRiga, CategoriaRiga, SottoCategoriaUtenza } from "./autoCategorizationService";
 
 export interface InvoiceLineItem {
   lineNumber: number;
@@ -9,6 +10,8 @@ export interface InvoiceLineItem {
   vatRate?: number;
   totalPrice: number;
   itemType?: 'piante' | 'vasi' | 'terriccio' | 'fitofarmaco' | 'fertilizzante' | 'materiale' | 'altro';
+  categoria?: CategoriaRiga;
+  sottoCategoriaUtenza?: SottoCategoriaUtenza;
 }
 
 export interface VatSummary {
@@ -277,6 +280,8 @@ export function parseInvoiceXml(xmlString: string): ParsedInvoice {
     const vatRate = parseNumber(getTextContent(lineXml, 'AliquotaIVA'));
     const lineNumber = parseInt(getTextContent(lineXml, 'NumeroLinea') || '0', 10);
     
+    const categorizzazione = classificaRiga(description);
+    
     return {
       lineNumber,
       description,
@@ -286,6 +291,8 @@ export function parseInvoiceXml(xmlString: string): ParsedInvoice {
       vatRate,
       totalPrice: totalPrice || (quantity * unitPrice),
       itemType: detectItemType(description),
+      categoria: categorizzazione.categoria,
+      sottoCategoriaUtenza: categorizzazione.sottoCategoriaUtenza,
     };
   });
   
