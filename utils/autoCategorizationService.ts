@@ -76,135 +76,147 @@ const FITOFARMACI_COMMERCIALI = [
 ];
 
 export function classificaRiga(descrizione: string): CategorizzazioneResult {
-  const desc = descrizione.toLowerCase().trim();
+  const d = descrizione.toLowerCase().trim();
   
-  // Regole specifiche Flora Toscana (priorità massima)
-  if (desc.includes('fondo sviluppo soci') || 
-      desc.includes('detrazione costo di servizio conf.fiori') ||
-      desc.includes('floratoscana') || 
-      desc.includes('flora toscana') || 
-      (desc.includes('spese accessorie') && desc.includes('flora'))) {
+  // Regole specifiche spese utenza Floratoscana (PRIORITA MASSIMA - prima di tutto)
+  const utenzeFloratoscanaKeywords = [
+    'progetto sviluppo soci',
+    'fondo sviluppo soci',
+    'detrazione costo conferimento fiori',
+    'detrazione costo di servizio conf.fiori',
+    'costi amministrativi',
+    'sfuso_2',
+  ];
+  
+  if (utenzeFloratoscanaKeywords.some(k => d.includes(k))) {
     return { categoria: 'utenze', sottoCategoriaUtenza: 'spese_floratoscana' };
   }
   
-  if (desc.includes('energia elettrica') || 
-      desc.includes('enel') || 
-      desc.includes('kwh') || 
-      desc.includes(' elettrica') ||
-      desc.includes('corrente elettrica') ||
-      desc.includes('fornitura energia') ||
-      desc.includes('consumo energia')) {
+  // Altre regole Flora Toscana generiche
+  if (d.includes('floratoscana') || 
+      d.includes('flora toscana') || 
+      (d.includes('spese accessorie') && d.includes('flora'))) {
+    return { categoria: 'utenze', sottoCategoriaUtenza: 'spese_floratoscana' };
+  }
+  
+  if (d.includes('energia elettrica') || 
+      d.includes('enel') || 
+      d.includes('kwh') || 
+      d.includes(' elettrica') ||
+      d.includes('corrente elettrica') ||
+      d.includes('fornitura energia') ||
+      d.includes('consumo energia')) {
     return { categoria: 'utenze', sottoCategoriaUtenza: 'luce' };
   }
   
-  if ((desc.includes('metano') || desc.includes(' gas ') || desc.includes('gpl')) &&
-      (desc.includes('fornitura') || desc.includes('consumo') || desc.includes('bolletta') || 
-       desc.includes('fattura') || desc.includes('utenza') || desc.includes('contatore'))) {
+  if ((d.includes('metano') || d.includes(' gas ') || d.includes('gpl')) &&
+      (d.includes('fornitura') || d.includes('consumo') || d.includes('bolletta') || 
+       d.includes('fattura') || d.includes('utenza') || d.includes('contatore'))) {
     return { categoria: 'utenze', sottoCategoriaUtenza: 'gas' };
   }
   
-  if (desc.includes('cia') || 
-      desc.includes('confederazione italiana agricoltori') ||
-      desc.includes('coldiretti') ||
-      desc.includes('confagricoltura')) {
+  if (d.includes('cia') || 
+      d.includes('confederazione italiana agricoltori') ||
+      d.includes('coldiretti') ||
+      d.includes('confagricoltura')) {
     return { categoria: 'utenze', sottoCategoriaUtenza: 'spese_cia' };
   }
   
-  if (desc.includes('protea') || 
-      desc.includes('leucospermum') || 
-      desc.includes('serruria') || 
-      desc.includes('telopea') ||
-      desc.includes('leucadendron') ||
-      desc.includes('banksia') ||
-      desc.includes('grevillea') ||
-      desc.includes('pianta') || 
-      desc.includes('piante') || 
-      desc.includes('piantina') ||
-      desc.includes('piantine') ||
-      desc.includes('talea') ||
-      desc.includes('talee')) {
+  if (d.includes('protea') || 
+      d.includes('leucospermum') || 
+      d.includes('serruria') || 
+      d.includes('telopea') ||
+      d.includes('leucadendron') ||
+      d.includes('banksia') ||
+      d.includes('grevillea') ||
+      d.includes('pianta') || 
+      d.includes('piante') || 
+      d.includes('piantina') ||
+      d.includes('piantine') ||
+      d.includes('talea') ||
+      d.includes('talee')) {
     return { categoria: 'piante', sottoCategoriaUtenza: '' };
   }
   
-  if (desc.includes('seme') || 
-      desc.includes('semi') || 
-      desc.includes('seeds') ||
-      desc.includes('sementi')) {
+  if (d.includes('seme') || 
+      d.includes('semi') || 
+      d.includes('seeds') ||
+      d.includes('sementi')) {
     return { categoria: 'semi', sottoCategoriaUtenza: '' };
   }
   
-  if (desc.includes('terriccio') || 
-      desc.includes('substrato') || 
-      desc.includes('torba') ||
-      desc.includes('perlite') ||
-      desc.includes('vermiculite') ||
-      desc.includes('fibra di cocco') ||
-      desc.includes('bark')) {
+  if (d.includes('terriccio') || 
+      d.includes('substrato') || 
+      d.includes('torba') ||
+      d.includes('perlite') ||
+      d.includes('vermiculite') ||
+      d.includes('fibra di cocco') ||
+      d.includes('bark')) {
     return { categoria: 'terriccio', sottoCategoriaUtenza: '' };
   }
   
-  if (desc.includes('vaso') || 
-      desc.includes('vasi') || 
-      desc.includes('contenitore') ||
-      desc.includes('contenitori') ||
-      desc.includes('plateau') ||
-      desc.includes('alveolare') ||
-      desc.includes('alveoli') ||
-      desc.includes('vassoio') ||
-      desc.includes('placca') ||
-      desc.includes('placche')) {
+  if (d.includes('vaso') || 
+      d.includes('vasi') || 
+      d.includes('contenitore') ||
+      d.includes('contenitori') ||
+      d.includes('plateau') ||
+      d.includes('alveolare') ||
+      d.includes('alveoli') ||
+      d.includes('vassoio') ||
+      d.includes('placca') ||
+      d.includes('placche')) {
     return { categoria: 'vasi', sottoCategoriaUtenza: '' };
   }
   
   const hasFitofarmaco = 
-    desc.includes('fitofarmaco') || 
-    desc.includes('agrofarmaco') || 
-    desc.includes('fungicida') || 
-    desc.includes('insetticida') ||
-    desc.includes('acaricida') ||
-    desc.includes('erbicida') ||
-    desc.includes('antiparassitario') ||
-    desc.includes('nematocida') ||
-    desc.includes('molluschicida') ||
-    desc.includes('rodenticida') ||
-    desc.includes('-clp-') ||
-    FITOFARMACI_COMMERCIALI.some(nome => desc.includes(nome));
+    d.includes('fitofarmaco') || 
+    d.includes('agrofarmaco') || 
+    d.includes('fungicida') || 
+    d.includes('insetticida') ||
+    d.includes('acaricida') ||
+    d.includes('erbicida') ||
+    d.includes('antiparassitario') ||
+    d.includes('nematocida') ||
+    d.includes('molluschicida') ||
+    d.includes('rodenticida') ||
+    d.includes('-clp-') ||
+    FITOFARMACI_COMMERCIALI.some(nome => d.includes(nome));
   
   if (hasFitofarmaco) {
     return { categoria: 'fitofarmaci', sottoCategoriaUtenza: '' };
   }
   
-  if (desc.includes('concime') || 
-      desc.includes('fertilizzante') || 
-      desc.includes('npk') ||
-      desc.includes('stallatico') ||
-      desc.includes('azoto') ||
-      desc.includes('fosforo') ||
-      desc.includes('potassio') ||
-      desc.includes('solfato') ||
-      desc.includes('urea') ||
-      desc.includes('nitrato') ||
-      desc.includes('ammonio') ||
-      desc.includes('microelementi') ||
-      desc.includes('chelato') ||
-      desc.includes('biostimolante') ||
-      desc.includes('kelpak') ||
-      desc.includes('haifastim') ||
-      desc.includes('alga') ||
-      desc.includes('alghe')) {
+  if (d.includes('concime') || 
+      d.includes('fertilizzante') || 
+      d.includes('npk') ||
+      d.includes('stallatico') ||
+      d.includes('azoto') ||
+      d.includes('fosforo') ||
+      d.includes('potassio') ||
+      d.includes('solfato') ||
+      d.includes('urea') ||
+      d.includes('nitrato') ||
+      d.includes('ammonio') ||
+      d.includes('microelementi') ||
+      d.includes('chelato') ||
+      d.includes('biostimolante') ||
+      d.includes('kelpak') ||
+      d.includes('haifastim') ||
+      d.includes('alga') ||
+      d.includes('alghe')) {
     return { categoria: 'fertilizzanti', sottoCategoriaUtenza: '' };
   }
   
-  if (desc.includes('gasolio') || 
-      desc.includes('gasoil') || 
-      desc.includes('gasolio agricolo') ||
-      desc.includes('gpl') ||
-      desc.includes('pellet') ||
-      desc.includes('legna') ||
-      desc.includes('combustibile') ||
-      desc.includes('carburante') ||
-      desc.includes('benzina') ||
-      desc.includes('nafta')) {
+  if (d.includes('gasolio') || 
+      d.includes('gasoil') || 
+      d.includes('gasolio agricolo') ||
+      d.includes('gpl') ||
+      d.includes('pellet') ||
+      d.includes('legna') ||
+      d.includes('combustibile') ||
+      d.includes('carburante') ||
+      d.includes('benzina') ||
+      d.includes('nafta')) {
     return { categoria: 'combustibile', sottoCategoriaUtenza: '' };
   }
   
