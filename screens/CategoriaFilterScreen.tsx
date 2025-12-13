@@ -150,13 +150,20 @@ export default function CategoriaFilterScreen({ navigation }: CategoriaFilterScr
     
     try {
       if (category === 'piante') {
-        await storage.savePlantRecord({
+        console.log('[DEBUG] Saving plant record:', {
+          variety: line.description.substring(0, 100),
+          quantity: line.quantity,
+          arrivalDate: line.invoiceDate,
+          sourceDocument: sourceDoc,
+        });
+        const savedRecord = await storage.savePlantRecord({
           variety: line.description.substring(0, 100),
           quantity: line.quantity,
           arrivalDate: line.invoiceDate,
           sourceDocument: sourceDoc,
           notes: `Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`,
         });
+        console.log('[DEBUG] Plant record saved successfully:', savedRecord);
       } else if (category === 'semi') {
         await storage.savePlantRecord({
           variety: `[Semi] ${line.description.substring(0, 90)}`,

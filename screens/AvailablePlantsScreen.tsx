@@ -40,6 +40,39 @@ function VarietyRow({ lot, onDistribute }: VarietyRowProps) {
     transform: [{ scale: scale.value }],
   }));
 
+  const formatDate = (dateString: string): string => {
+    try {
+      const parts = dateString.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      return dateString;
+    } catch {
+      return dateString;
+    }
+  };
+
+  const getArrivalDateDisplay = (): string | null => {
+    if (!lot.sources || lot.sources.length === 0) return null;
+    
+    const validDates = lot.sources
+      .map(s => s.arrivalDate)
+      .filter(d => d && d.length > 0)
+      .sort();
+    
+    if (validDates.length === 0) return null;
+    
+    const earliest = validDates[0];
+    const latest = validDates[validDates.length - 1];
+    
+    if (earliest === latest) {
+      return `Arrivo: ${formatDate(earliest)}`;
+    }
+    return `Arrivi: ${formatDate(earliest)} - ${formatDate(latest)}`;
+  };
+
+  const arrivalDisplay = getArrivalDateDisplay();
+
   return (
     <AnimatedPressable
       onPress={() => lot.availableQuantity > 0 ? onDistribute(lot) : null}
@@ -56,6 +89,11 @@ function VarietyRow({ lot, onDistribute }: VarietyRowProps) {
         <ThemedText style={{ color: theme.textSecondary, fontSize: 12 }}>
           Totale: {lot.totalQuantity.toLocaleString()} | Distribuite: {lot.distributedQuantity.toLocaleString()}
         </ThemedText>
+        {arrivalDisplay ? (
+          <ThemedText style={{ color: theme.activityWatering, fontSize: 11, marginTop: 2 }}>
+            {arrivalDisplay}
+          </ThemedText>
+        ) : null}
       </View>
       <View style={styles.quantityBadge}>
         <ThemedText style={[
