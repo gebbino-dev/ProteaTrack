@@ -58,15 +58,15 @@ export default function CategoriaFilterScreen({ navigation }: CategoriaFilterScr
 
   const loadData = useCallback(async () => {
     try {
-      const [summary, subSummary, allLines] = await Promise.all([
+      const [summary, subSummary, unprocessedLines] = await Promise.all([
         pendingInvoiceStore.getCategoriaSummary(),
         pendingInvoiceStore.getSottocategoriaUtenzaSummary(),
-        pendingInvoiceStore.getPendingLines(),
+        pendingInvoiceStore.getUnprocessedLines(),
       ]);
       
       setCategoriaSummary(summary);
       setSottocategoriaSummary(subSummary);
-      setLines(allLines);
+      setLines(unprocessedLines);
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
