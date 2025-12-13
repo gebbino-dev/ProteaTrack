@@ -64,13 +64,19 @@ export function extractGenus(description: string): string {
 export function extractVariety(description: string): string {
   let variety = description.trim();
   
+  // Remove leading quantity patterns like "100 x " or "50-"
   variety = variety.replace(/^\d+\s*[-x×]\s*/i, '');
+  // Remove trailing quantity/multiplier patterns
   variety = variety.replace(/\s+x\s*\d+.*$/i, '');
-  variety = variety.replace(/\s*\(.*?\)\s*/g, ' ');
-  variety = variety.replace(/\bPIANT[AE]\b/gi, '');
-  variety = variety.replace(/\bVASO?\b/gi, '');
+  
+  // Remove size/packaging info (VASO, CM, etc.) but keep cultivar names
+  variety = variety.replace(/\bVASO?\s*\d*/gi, '');
   variety = variety.replace(/\bCM\.?\s*\d+/gi, '');
   variety = variety.replace(/\b\d+\s*CM\.?\b/gi, '');
+  variety = variety.replace(/\bLT\.?\s*\d+/gi, '');
+  variety = variety.replace(/\b\d+\s*LT\.?\b/gi, '');
+  
+  // Normalize whitespace
   variety = variety.replace(/\s+/g, ' ').trim();
   
   if (variety.length < 3) {
@@ -81,9 +87,16 @@ export function extractVariety(description: string): string {
 }
 
 export function normalizeVarietyName(variety: string): string {
+  // Canonicalize punctuation for consistent matching
   return variety
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
+    // Standardize quotes to nothing (remove them)
+    .replace(/[''`"\"]/g, '')
+    // Standardize dashes/hyphens to single space
+    .replace(/[-–—]/g, ' ')
+    // Remove parentheses content for matching (but keep outside)
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    // Normalize whitespace
     .replace(/\s+/g, ' ')
     .trim();
 }
