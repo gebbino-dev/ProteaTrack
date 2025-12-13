@@ -15,13 +15,20 @@ import {
   PendingInvoiceLine,
   CategoriaRiga,
   SottoCategoriaUtenza,
+  ItemCategory,
+  CATEGORY_CONFIG,
 } from "@/utils/pendingInvoiceStore";
 import { 
   classificaTutteLeRighe,
+  classificaRiga,
   CATEGORIA_CONFIG,
   SOTTOCATEGORIA_UTENZA_CONFIG,
 } from "@/utils/autoCategorizationService";
+import { inventoryStore } from "@/utils/inventoryStore";
+import { storage } from "@/utils/storage";
 import { LavoroStackParamList } from "@/navigation/LavoroStackNavigator";
+
+type MaterialType = 'vasi' | 'terriccio' | 'materiale' | 'altro';
 
 type CategoriaFilterScreenProps = {
   navigation: NativeStackNavigationProp<LavoroStackParamList, "CategoriaFilter">;
@@ -46,6 +53,8 @@ export default function CategoriaFilterScreen({ navigation }: CategoriaFilterScr
   const [categoriaSummary, setCategoriaSummary] = useState<{ categoria: CategoriaRiga; count: number; total: number }[]>([]);
   const [sottocategoriaSummary, setSottocategoriaSummary] = useState<{ sottocategoria: SottoCategoriaUtenza; count: number; total: number }[]>([]);
   const [isClassifying, setIsClassifying] = useState(false);
+  const [selectedLine, setSelectedLine] = useState<PendingInvoiceLine | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -105,6 +114,183 @@ export default function CategoriaFilterScreen({ navigation }: CategoriaFilterScr
       ]
     );
   };
+
+  const handleChangeCategory = async (newCategory: ItemCategory) => {
+    if (!selectedLine) return;
+    
+    try {
+      const result = classificaRiga(selectedLine.description);
+      const categoriaRigaMap: Record<ItemCategory, CategoriaRiga> = {
+        'piante': 'piante',
+        'semi': 'semi',
+        'vasi': 'vasi',
+        'terriccio': 'terriccio',
+        'fitofarmaco': 'fitofarmaci',
+        'fertilizzante': 'fertilizzanti',
+        'materiale': 'materiale_generico',
+        'utenza': 'utenze',
+        'altro': 'materiale_generico',
+      };
+      
+      await pendingInvoiceStore.updateLine(selectedLine.id, {
+        assignedCategory: newCategory,
+        categoria: categoriaRigaMap[newCategory],
+      });
+      setModalVisible(false);
+      setSelectedLine(null);
+      loadData();
+    } catch (error) {
+      console.error("Error updating category:", error);
+    }
+  };
+
+  const processLineToInventory = async (line: PendingInvoiceLine): Promise<boolean> => {
+    const category = line.assignedCategory;
+    const sourceDoc = `${line.invoiceNumber} del ${line.invoiceDate}`;
+    
+    try {
+      if (category === 'piante') {
+        await storage.savePlantRecord({
+          variety: line.description.substring(0, 100),
+          quantity: line.quantity,
+          arrivalDate: line.invoiceDate,
+          sourceDocument: sourceDoc,
+          notes: `Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`,
+        });
+      } else if (category === 'semi') {
+        await storage.savePlantRecord({
+          variety: `[Semi] ${line.description.substring(0, 90)}`,
+          quantity: line.quantity,
+          arrivalDate: line.invoiceDate,
+          sourceDocument: sourceDoc,
+          notes: `SEMI. Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`,
+        });
+      } else if (category === 'fitofarmaco' || category === 'fertilizzante') {
+        await storage.saveProduct({
+          name: line.description,
+          activeIngredient: '',
+          formulation: line.unitOfMeasure || '',
+          registrationNumber: '',
+          phiDays: undefined,
+          fracCode: '',
+          notes: `Importato: ${sourceDoc}. Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR`,
+        });
+      } else if (['vasi', 'terriccio', 'materiale', 'altro'].includes(category)) {
+        await inventoryStore.saveMaterial({
+          name: line.description,
+          type: category as MaterialType,
+          quantity: line.quantity,
+          unitOfMeasure: line.unitOfMeasure || 'pz',
+          unitPrice: line.unitPrice,
+          totalPrice: line.totalPrice,
+          sourceDocument: sourceDoc,
+          arrivalDate: line.invoiceDate,
+          notes: `Fornitore: ${line.supplierName}`,
+        });
+      } else if (category === 'utenza') {
+        await inventoryStore.saveMaterial({
+          name: line.description,
+          type: 'altro',
+          quantity: 1,
+          unitOfMeasure: 'servizio',
+          unitPrice: line.totalPrice,
+          totalPrice: line.totalPrice,
+          sourceDocument: sourceDoc,
+          arrivalDate: line.invoiceDate,
+          notes: `UTENZA. Fornitore: ${line.supplierName}`,
+        });
+      } else {
+        console.warn(`Unknown category: ${category}, saving as generic material`);
+        await inventoryStore.saveMaterial({
+          name: line.description,
+          type: 'altro',
+          quantity: line.quantity,
+          unitOfMeasure: line.unitOfMeasure || 'pz',
+          unitPrice: line.unitPrice,
+          totalPrice: line.totalPrice,
+          sourceDocument: sourceDoc,
+          arrivalDate: line.invoiceDate,
+          notes: `Categoria sconosciuta: ${category}. Fornitore: ${line.supplierName}`,
+        });
+      }
+      return true;
+    } catch (error) {
+      console.error("Error processing line to inventory:", error);
+      return false;
+    }
+  };
+
+  const handleConfirmLine = async (line: PendingInvoiceLine) => {
+    if (!line.assignedCategory) {
+      Alert.alert(
+        "Categoria Mancante",
+        "Assegna una categoria prima di confermare questa riga.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    const categoryConfig = CATEGORY_CONFIG[line.assignedCategory];
+    const categoryLabel = categoryConfig?.label || line.assignedCategory;
+
+    const confirmAction = async () => {
+      try {
+        const success = await processLineToInventory(line);
+        if (success) {
+          await pendingInvoiceStore.markAsProcessed(line.id);
+          loadData();
+        } else {
+          Alert.alert("Errore", "Impossibile processare la riga. Riprova.");
+        }
+      } catch (error) {
+        console.error("Error confirming line:", error);
+        Alert.alert("Errore", "Si è verificato un errore durante la conferma.");
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm(`Confermare "${line.description}" come ${categoryLabel}?`)) {
+        confirmAction();
+      }
+    } else {
+      Alert.alert(
+        "Conferma Assegnazione",
+        `Confermare "${line.description.substring(0, 50)}..." come ${categoryLabel}?`,
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: "Conferma", onPress: confirmAction },
+        ]
+      );
+    }
+  };
+
+  const handleDeleteLine = async (line: PendingInvoiceLine) => {
+    const deleteAction = async () => {
+      try {
+        await pendingInvoiceStore.deleteLine(line.id);
+        loadData();
+      } catch (error) {
+        console.error("Error deleting line:", error);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm(`Eliminare "${line.description}"?`)) {
+        deleteAction();
+      }
+    } else {
+      Alert.alert(
+        "Elimina Riga",
+        `Eliminare "${line.description.substring(0, 50)}..."?`,
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: "Elimina", style: "destructive", onPress: deleteAction },
+        ]
+      );
+    }
+  };
+
+  const categories = Object.keys(CATEGORY_CONFIG) as ItemCategory[];
 
   const filteredLines = lines.filter(line => {
     if (selectedSottocategoria) {
@@ -322,6 +508,38 @@ export default function CategoriaFilterScreen({ navigation }: CategoriaFilterScr
                 <ThemedText style={[styles.supplierText, { color: theme.textSecondary }]}>
                   {line.supplierName}
                 </ThemedText>
+
+                <Spacer height={Spacing.md} />
+
+                <View style={styles.actionRow}>
+                  <Pressable
+                    style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+                    onPress={() => {
+                      setSelectedLine(line);
+                      setModalVisible(true);
+                    }}
+                  >
+                    <Feather name="edit-2" size={16} color={theme.text} />
+                    <ThemedText style={styles.actionText}>Cambia</ThemedText>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.actionButton, { backgroundColor: theme.success + '20' }]}
+                    onPress={() => handleConfirmLine(line)}
+                  >
+                    <Feather name="check" size={16} color={theme.success} />
+                    <ThemedText style={[styles.actionText, { color: theme.success }]}>
+                      Conferma
+                    </ThemedText>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.actionButton, { backgroundColor: theme.error + '20' }]}
+                    onPress={() => handleDeleteLine(line)}
+                  >
+                    <Feather name="trash-2" size={16} color={theme.error} />
+                  </Pressable>
+                </View>
               </View>
             );
           })
@@ -329,6 +547,64 @@ export default function CategoriaFilterScreen({ navigation }: CategoriaFilterScr
 
         <Spacer height={80} />
       </ScreenScrollView>
+
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText type="h3">Cambia Categoria</ThemedText>
+              <Pressable onPress={() => setModalVisible(false)}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+            
+            <Spacer height={Spacing.md} />
+            
+            {selectedLine ? (
+              <ThemedText style={[styles.modalDescription, { color: theme.textSecondary }]} numberOfLines={2}>
+                {selectedLine.description}
+              </ThemedText>
+            ) : null}
+            
+            <Spacer height={Spacing.lg} />
+            
+            <ScrollView style={styles.categoryList}>
+              {categories.map((cat) => {
+                const config = CATEGORY_CONFIG[cat];
+                const isSelected = selectedLine?.assignedCategory === cat;
+                
+                return (
+                  <Pressable
+                    key={cat}
+                    style={[
+                      styles.categoryOption,
+                      { 
+                        backgroundColor: isSelected ? config.color + '30' : theme.backgroundDefault,
+                        borderColor: isSelected ? config.color : 'transparent',
+                        borderWidth: isSelected ? 2 : 0,
+                      }
+                    ]}
+                    onPress={() => handleChangeCategory(cat)}
+                  >
+                    <Feather name={config.icon as any} size={20} color={config.color} />
+                    <ThemedText style={styles.categoryOptionText}>
+                      {config.label}
+                    </ThemedText>
+                    {isSelected ? (
+                      <Feather name="check" size={18} color={config.color} />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -444,5 +720,56 @@ const styles = StyleSheet.create({
   supplierText: {
     fontSize: 11,
     marginTop: Spacing.xs,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.xs,
+  },
+  actionText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalDescription: {
+    fontSize: 14,
+  },
+  categoryList: {
+    maxHeight: 400,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.sm,
+    gap: Spacing.md,
+  },
+  categoryOptionText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
   },
 });
