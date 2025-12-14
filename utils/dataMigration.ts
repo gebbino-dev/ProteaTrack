@@ -1,19 +1,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { storage } from './storage';
-import { cleanVarietyForSaving, extractGenus } from './plantWarehouse';
+import { cleanVarietyForSaving } from './plantWarehouse';
 
-const MIGRATION_KEY = 'serra_migration_v2';
+const CURRENT_MIGRATION_VERSION = 4;
+const MIGRATION_VERSION_KEY = 'serra_migration_version';
 
 export async function runDataMigrations(): Promise<void> {
   try {
-    const migrationDone = await AsyncStorage.getItem(MIGRATION_KEY);
+    const versionStr = await AsyncStorage.getItem(MIGRATION_VERSION_KEY);
+    const currentVersion = versionStr ? parseInt(versionStr, 10) : 0;
     
-    if (migrationDone === 'done') {
-      console.log('[Migration] Already completed, skipping');
+    if (currentVersion >= CURRENT_MIGRATION_VERSION) {
+      console.log(`[Migration] Already at version ${currentVersion}, skipping`);
       return;
     }
     
-    console.log('[Migration] Starting plant variety cleanup...');
+    console.log(`[Migration] Upgrading from version ${currentVersion} to ${CURRENT_MIGRATION_VERSION}...`);
     
     const inventory = await storage.getPlantInventory();
     let cleaned = 0;
@@ -25,7 +27,7 @@ export async function runDataMigrations(): Promise<void> {
       if (cleanedVariety !== originalVariety) {
         plant.variety = cleanedVariety;
         cleaned++;
-        console.log(`[Migration] Cleaned: "${originalVariety.substring(0, 40)}..." -> "${cleanedVariety}"`);
+        console.log(`[Migration] Cleaned: "${originalVariety.substring(0, 50)}..." -> "${cleanedVariety}"`);
       }
     }
     
@@ -36,8 +38,8 @@ export async function runDataMigrations(): Promise<void> {
       console.log('[Migration] No plants needed cleaning');
     }
     
-    await AsyncStorage.setItem(MIGRATION_KEY, 'done');
-    console.log('[Migration] Complete');
+    await AsyncStorage.setItem(MIGRATION_VERSION_KEY, CURRENT_MIGRATION_VERSION.toString());
+    console.log(`[Migration] Complete - now at version ${CURRENT_MIGRATION_VERSION}`);
     
   } catch (error) {
     console.error('[Migration] Error:', error);
@@ -45,7 +47,7 @@ export async function runDataMigrations(): Promise<void> {
 }
 
 export async function forceMigration(): Promise<number> {
-  await AsyncStorage.removeItem(MIGRATION_KEY);
+  await AsyncStorage.removeItem(MIGRATION_VERSION_KEY);
   
   const inventory = await storage.getPlantInventory();
   let cleaned = 0;
