@@ -106,6 +106,17 @@ export function cleanVarietyForSaving(description: string): string {
   // First extract the variety
   let variety = extractVariety(description);
   
+  // Remove trailing codes in parentheses like (901), (060611), etc.
+  variety = variety.replace(/\s*\(\d+\)?\s*$/g, '');
+  variety = variety.replace(/\s*\([^)]*\d+[^)]*\)\s*$/g, '');
+  
+  // Remove backticks and other stray punctuation at end
+  variety = variety.replace(/[`'"\s]+$/g, '');
+  
+  // Remove "MMEA" "HORO" codes that appear after trademark
+  variety = variety.replace(/\s+MMEA\s*/gi, ' ');
+  variety = variety.replace(/\s+HORO\s*/gi, ' ');
+  
   // Additional cleaning for saving
   // Limit to first meaningful portion (before any invoice notes)
   const notePatterns = [
@@ -114,6 +125,8 @@ export function cleanVarietyForSaving(description: string): string {
     /\s+vi\s+accredit/i,
     /\s+nota\s+/i,
     /\s+omaggio\s+/i,
+    /\s+NUMERO\s*/i,
+    /\s+Fornitore:/i,
   ];
   
   for (const pattern of notePatterns) {
@@ -123,14 +136,17 @@ export function cleanVarietyForSaving(description: string): string {
     }
   }
   
+  // Normalize multiple spaces
+  variety = variety.replace(/\s+/g, ' ').trim();
+  
   // Limit length to avoid very long descriptions
-  if (variety.length > 80) {
+  if (variety.length > 60) {
     // Try to find a natural break point
-    const breakPoint = variety.lastIndexOf(' ', 80);
-    if (breakPoint > 30) {
+    const breakPoint = variety.lastIndexOf(' ', 60);
+    if (breakPoint > 25) {
       variety = variety.substring(0, breakPoint);
     } else {
-      variety = variety.substring(0, 80);
+      variety = variety.substring(0, 60);
     }
   }
   

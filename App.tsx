@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { StyleSheet } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -8,8 +8,13 @@ import { StatusBar } from "expo-status-bar";
 
 import MainTabNavigator from "@/navigation/MainTabNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { runDataMigrations } from "@/utils/dataMigration";
 
 export default function App() {
+  useEffect(() => {
+    runDataMigrations();
+  }, []);
+
   return (
   <ErrorBoundary>
     <SafeAreaProvider>
