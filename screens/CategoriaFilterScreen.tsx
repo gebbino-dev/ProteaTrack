@@ -26,6 +26,7 @@ import {
 } from "@/utils/autoCategorizationService";
 import { inventoryStore } from "@/utils/inventoryStore";
 import { storage } from "@/utils/storage";
+import { cleanVarietyForSaving } from "@/utils/plantWarehouse";
 import { LavoroStackParamList } from "@/navigation/LavoroStackNavigator";
 
 type MaterialType = 'vasi' | 'terriccio' | 'materiale' | 'altro';
@@ -150,14 +151,15 @@ export default function CategoriaFilterScreen({ navigation }: CategoriaFilterScr
     
     try {
       if (category === 'piante') {
+        const cleanedVariety = cleanVarietyForSaving(line.description);
         console.log('[DEBUG] Saving plant record:', {
-          variety: line.description.substring(0, 100),
+          variety: cleanedVariety,
           quantity: line.quantity,
           arrivalDate: line.invoiceDate,
           sourceDocument: sourceDoc,
         });
         const savedRecord = await storage.savePlantRecord({
-          variety: line.description.substring(0, 100),
+          variety: cleanedVariety,
           quantity: line.quantity,
           arrivalDate: line.invoiceDate,
           sourceDocument: sourceDoc,
@@ -165,8 +167,9 @@ export default function CategoriaFilterScreen({ navigation }: CategoriaFilterScr
         });
         console.log('[DEBUG] Plant record saved successfully:', savedRecord);
       } else if (category === 'semi') {
+        const cleanedVariety = cleanVarietyForSaving(line.description);
         await storage.savePlantRecord({
-          variety: `[Semi] ${line.description.substring(0, 90)}`,
+          variety: `[Semi] ${cleanedVariety}`,
           quantity: line.quantity,
           arrivalDate: line.invoiceDate,
           sourceDocument: sourceDoc,

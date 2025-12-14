@@ -76,6 +76,21 @@ export function extractVariety(description: string): string {
   variety = variety.replace(/\bLT\.?\s*\d+/gi, '');
   variety = variety.replace(/\b\d+\s*LT\.?\b/gi, '');
   
+  // Remove common invoice phrases and notes
+  variety = variety.replace(/\btanto\s+vi\b.*$/gi, '');
+  variety = variety.replace(/\baccredit.*$/gi, '');
+  variety = variety.replace(/\bper\s+problemi\b.*$/gi, '');
+  variety = variety.replace(/\bavuti\s+su\b.*$/gi, '');
+  variety = variety.replace(/\brimborso\b.*$/gi, '');
+  variety = variety.replace(/\bnota\s+credito\b.*$/gi, '');
+  variety = variety.replace(/\bsconto\b.*$/gi, '');
+  variety = variety.replace(/\bomaggio\b.*$/gi, '');
+  
+  // Remove asterisks and special markers
+  variety = variety.replace(/\*+/g, '');
+  variety = variety.replace(/®/g, '');
+  variety = variety.replace(/™/g, '');
+  
   // Normalize whitespace
   variety = variety.replace(/\s+/g, ' ').trim();
   
@@ -84,6 +99,42 @@ export function extractVariety(description: string): string {
   }
   
   return variety;
+}
+
+// Clean variety name for saving - more aggressive cleaning
+export function cleanVarietyForSaving(description: string): string {
+  // First extract the variety
+  let variety = extractVariety(description);
+  
+  // Additional cleaning for saving
+  // Limit to first meaningful portion (before any invoice notes)
+  const notePatterns = [
+    /\s+tanto\s+/i,
+    /\s+per\s+problemi/i,
+    /\s+vi\s+accredit/i,
+    /\s+nota\s+/i,
+    /\s+omaggio\s+/i,
+  ];
+  
+  for (const pattern of notePatterns) {
+    const match = variety.search(pattern);
+    if (match > 10) {
+      variety = variety.substring(0, match);
+    }
+  }
+  
+  // Limit length to avoid very long descriptions
+  if (variety.length > 80) {
+    // Try to find a natural break point
+    const breakPoint = variety.lastIndexOf(' ', 80);
+    if (breakPoint > 30) {
+      variety = variety.substring(0, breakPoint);
+    } else {
+      variety = variety.substring(0, 80);
+    }
+  }
+  
+  return variety.trim();
 }
 
 export function normalizeVarietyName(variety: string): string {

@@ -20,7 +20,7 @@ import {
 } from "@/utils/pendingInvoiceStore";
 import { inventoryStore, MaterialRecord } from "@/utils/inventoryStore";
 import { storage } from "@/utils/storage";
-import { plantWarehouse, GenusGroup, PlantLot } from "@/utils/plantWarehouse";
+import { plantWarehouse, GenusGroup, PlantLot, cleanVarietyForSaving } from "@/utils/plantWarehouse";
 import { LavoroStackParamList } from "@/navigation/LavoroStackNavigator";
 import { PlantRecord } from "@/types";
 
@@ -160,16 +160,18 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
     
     try {
       if (category === 'piante') {
+        const cleanedVariety = cleanVarietyForSaving(line.description);
         await storage.savePlantRecord({
-          variety: line.description.substring(0, 100),
+          variety: cleanedVariety,
           quantity: line.quantity,
           arrivalDate: line.invoiceDate,
           sourceDocument: sourceDoc,
           notes: `Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`,
         });
       } else if (category === 'semi') {
+        const cleanedVariety = cleanVarietyForSaving(line.description);
         await storage.savePlantRecord({
-          variety: `[Semi] ${line.description.substring(0, 90)}`,
+          variety: `[Semi] ${cleanedVariety}`,
           quantity: line.quantity,
           arrivalDate: line.invoiceDate,
           sourceDocument: sourceDoc,
