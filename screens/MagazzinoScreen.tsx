@@ -434,7 +434,8 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
   const categories = Object.keys(CATEGORY_CONFIG) as ItemCategory[];
 
   const pendingPlants = pendingLines.filter(l => l.assignedCategory === 'piante' || l.assignedCategory === 'semi');
-  const pendingMaterials = pendingLines.filter(l => !['piante', 'semi'].includes(l.assignedCategory));
+  const materialCategories = ['vasi', 'terriccio', 'materiale', 'altro'];
+  const pendingMaterials = pendingLines.filter(l => materialCategories.includes(l.assignedCategory));
 
   const handleConfirmAllPending = async (lines: PendingInvoiceLine[]) => {
     const confirmAction = async () => {
