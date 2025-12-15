@@ -1,0 +1,67 @@
+Voglio sistemare il flusso “righe fattura → magazzino piante”.  
+Adesso le fatture riempiono `pendingInvoiceStore`, ma quando in Magazzino approvo le righe, le piante non finiscono correttamente in `serra_plant_inventory`.
+
+Ti chiedo di fare queste modifiche:
+
+1. **Crea una funzione di servizio per applicare le righe pending all’inventario piante**
+
+Crea un nuovo file `services/applyPendingLinesToInventory.ts` con questo contenuto:
+
+```ts
+import { pendingInvoiceStore } from '@/utils/pendingInvoiceStore';
+import { storage } from '@/utils/storage';
+import { extractVarietyFromDescription } from '@/utils/xmlImportService';
+
+export async function applyPendingLinesToPlantInventory() {
+  // Prendo tutte le righe NON ancora processate
+  const lines = await pendingInvoiceStore.getUnprocessedLines();
+
+  // Considero solo quelle assegnate come "piante"
+  const plantLines = lines.filter(l => l.assignedCategory === 'piante');
+
+  for (const line of plantLines) {
+    const variety = extractVarietyFromDescription(line.description);
+    // Per ora uso come "species" il genere ricavato dal nome varietà,
+    // cioè la prima parola (es. "Leucospermum cordifolium" -> "Leucospermum")
+    const species = variety.split(' ')[0] || variety;
+
+    await storage.savePlantRecord({
+      variety,
+      species,
+      quantity: line.quantity,
+      arrivalDate: line.invoiceDate,
+      notes: `FT ${line.invoiceNumber} - ${line.supplierName}`,
+    });
+
+    // Marco la riga come processata, così non viene riusata
+    await pendingInvoiceStore.markAsProcessed(line.id);
+  }
+
+  return {
+    totalLines: lines.length,
+    plantLines: plantLines.length,
+  };
+}
+```
+
+2. **Collega questa funzione al bottone “Classifica / Approva righe” in Magazzino**
+
+Nel file `screens/MagazzinoScreen.tsx`:
+
+- Importa la funzione:
+
+```ts
+import { applyPendingLinesToPlantInventory } from '@/services/applyPendingLinesToInventory';
+```
+
+- Nel callback che usi quando l’utente preme il bottone tipo “Classifica tutto / Conferma righe” (quello che oggi chiama solo `pendingInvoiceStore.getUnprocessedLines()`), aggiungi:
+
+```ts
+const result = await applyPendingLinesToPlantInventory();
+// opzionale: mostra un Alert con il riepilogo
+// es. `result.plantLines` righe di piante inviate all'inventario
+```
+
+3. **Non toccare la schermata `PlantInventoryScreen`**
+
+`PlantInventoryScreen` deve solo leggere da `storage.getPlantInventory()` e raggruppare per `species`; se i dati entrano correttamente da `applyPendingLinesToPlantInventory`, i totali e i gruppi Leucospermum/Protea/Telopea dovrebbero iniziare a tornare.

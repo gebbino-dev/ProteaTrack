@@ -422,7 +422,7 @@ export function extractInventoryItems(
     });
 }
 
-function extractVarietyFromDescription(description: string): string {
+export function extractVarietyFromDescription(description: string): string {
   const proteaceaeVarieties = [
     'Leucospermum cordifolium',
     'Leucospermum reflexum',
