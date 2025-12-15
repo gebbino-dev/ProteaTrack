@@ -30,7 +30,7 @@ export default function AccountingStackNavigator() {
         name="FinancialDashboard"
         component={FinancialDashboardScreen}
         options={{
-          headerTitle: () => <HeaderTitle title="Gestione" showIcon={false} />,
+          headerTitle: () => <HeaderTitle title="Gestione e Report" showIcon={false} />,
         }}
       />
       <Stack.Screen

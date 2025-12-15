@@ -3,9 +3,9 @@
 ## Panoramica
 ProteaTrack è un'app mobile per la gestione di serre dedicate alla coltivazione di piante Proteaceae in vaso. L'app permette di tracciare le attività quotidiane, i trattamenti fitosanitari, la contabilità e di generare report analitici.
 
-## Architettura a 6 Moduli
+## Architettura a 5 Moduli
 
-L'app è organizzata in 6 moduli principali accessibili tramite bottom tab navigation:
+L'app è organizzata in 5 moduli principali accessibili tramite bottom tab navigation:
 
 ### 1. Dashboard (Home)
 - Statistiche rapide: totale piante, attività odierne, bancali attivi
@@ -40,21 +40,20 @@ L'app è organizzata in 6 moduli principali accessibili tramite bottom tab navig
 - Esportazione CSV per documentazione
 - Usa tipi: `PhytosanitaryProduct`, `Treatment`
 
-### 5. Contabilità (Gestionale Contabile)
-- Dashboard finanziaria: riepilogo entrate/uscite
-- Registrazione movimenti con categorie predefinite
-- Categorie costi: Materiali, Manodopera, Fitofarmaci, Fertilizzanti, etc.
-- Categorie ricavi: Vendita Piante, Vendita Fiori, Servizi, Contributi
-- Esportazione CSV per periodo
-- Usa tipi: `TransactionCategory`, `Transaction`, `FinancialSummary`
-
-### 6. Report (Analisi e Statistiche)
-- Selezione periodo (anno/mese)
-- Riepilogo finanziario con margine
-- Statistiche serre (piante, settori attivi)
-- Breakdown attività per tipo
-- Breakdown trattamenti per prodotto
-- Usa tipi: `FinancialSummary`, `GreenhouseStats`
+### 5. Gestione (Contabilità + Report Unificati)
+- **Selezione Periodo Flessibile**: seleziona un intervallo di mesi consecutivi (fino a 18+ mesi)
+  - Pulsanti rapidi: Mese corrente, Trimestre, Da inizio anno, Anno intero
+  - Selezione manuale: tocca mese iniziale, poi mese finale
+- **Dashboard Finanziaria**: riepilogo entrate/uscite per il periodo selezionato
+- **Margine Periodo**: calcolo automatico ricavi - costi
+- **Top Categorie**: le 5 categorie con più movimenti
+- **Statistiche Serre**: piante totali, settori attivi
+- **Attività nel Periodo**: breakdown per tipo (innaffiatura, concimazione, etc.)
+- **Trattamenti nel Periodo**: breakdown per prodotto fitosanitario
+- **Ultimi Movimenti**: gli ultimi 5 movimenti nel periodo
+- **Registrazione movimenti** con categorie predefinite
+- **Importa Fattura XML**: import da FatturaPA
+- Usa tipi: `TransactionCategory`, `Transaction`, `FinancialSummary`, `GreenhouseStats`
 
 ## Struttura delle Serre
 L'app gestisce 3 serre da 2000 m² ciascuna:
@@ -111,26 +110,22 @@ Ogni settore contiene 5 bancali: B1, B2, B3, B4, B5
   - TreatmentListScreen.tsx       # Lista trattamenti
   - TreatmentEditScreen.tsx       # Form registrazione trattamento
 
-  # Contabilità
-  - FinancialDashboardScreen.tsx  # Dashboard finanziaria
+  # Gestione (Contabilità + Report)
+  - FinancialDashboardScreen.tsx  # Dashboard unificata con selezione periodo flessibile
   - TransactionListScreen.tsx     # Lista movimenti
   - TransactionEditScreen.tsx     # Form registrazione movimento
-
-  # Report
-  - ReportScreen.tsx              # Analisi per periodo
 
   # Altro
   - ProfileScreen.tsx             # Impostazioni azienda
   - CalendarScreen.tsx            # Vista calendario unificata (tutti gli eventi)
 
 /navigation
-  - MainTabNavigator.tsx          # Tab bar principale (6 tab)
+  - MainTabNavigator.tsx          # Tab bar principale (5 tab)
   - DashboardStackNavigator.tsx   # Stack dashboard
   - GreenhouseStackNavigator.tsx  # Stack colture
-  - LavoroStackNavigator.tsx      # Stack lavoro
+  - LavoroStackNavigator.tsx      # Stack magazzino
   - NotebookStackNavigator.tsx    # Stack quaderno
-  - AccountingStackNavigator.tsx  # Stack contabilità
-  - ReportStackNavigator.tsx      # Stack report
+  - AccountingStackNavigator.tsx  # Stack gestione (contabilità + report)
   - ProfileStackNavigator.tsx     # Stack profilo
 
 /components
@@ -249,3 +244,9 @@ File correlati: `utils/eventAggregator.ts`, `screens/CalendarScreen.tsx`
 - `utils/autoCategorizationService.ts` - funzione `classificaRiga()` e batch update
 - `screens/CategoriaFilterScreen.tsx` - UI filtri per categoria
 - `utils/pendingInvoiceStore.ts` - campi `categoria` e `sottoCategoriaUtenza`
+
+### Selezione Periodo Flessibile (Gestione)
+- Permette selezione di intervalli di mesi consecutivi (1-18+ mesi)
+- Pulsanti rapidi: Mese, Trimestre, Da inizio anno, Anno intero
+- Modal con griglia mesi per selezione manuale
+- Filtra tutti i dati: transazioni, attività, trattamenti

@@ -8,7 +8,6 @@ import GreenhouseStackNavigator from "@/navigation/GreenhouseStackNavigator";
 import LavoroStackNavigator from "@/navigation/LavoroStackNavigator";
 import NotebookStackNavigator from "@/navigation/NotebookStackNavigator";
 import AccountingStackNavigator from "@/navigation/AccountingStackNavigator";
-import ReportStackNavigator from "@/navigation/ReportStackNavigator";
 import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -18,7 +17,6 @@ export type MainTabParamList = {
   LavoroTab: undefined;
   QuadernoTab: undefined;
   ContabilitaTab: undefined;
-  ReportTab: undefined;
   ProfileTab: undefined;
 };
 
@@ -100,19 +98,9 @@ export default function MainTabNavigator() {
         name="ContabilitaTab"
         component={AccountingStackNavigator}
         options={{
-          title: "Contabilita",
+          title: "Gestione",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="dollar-sign" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="ReportTab"
-        component={ReportStackNavigator}
-        options={{
-          title: "Report",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="bar-chart-2" size={size} color={color} />
+            <Feather name="pie-chart" size={size} color={color} />
           ),
         }}
       />
