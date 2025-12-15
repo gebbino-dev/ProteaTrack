@@ -491,6 +491,11 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
             ]}
             onPress={() => setSelectedTab('piante')}
           >
+            {pendingPlants.length > 0 ? (
+              <View style={[styles.pendingBadge, { backgroundColor: theme.warning }]}>
+                <ThemedText style={styles.pendingBadgeText}>{pendingPlants.length}</ThemedText>
+              </View>
+            ) : null}
             <Feather name="sun" size={20} color={theme.primary} />
             <ThemedText type="h3" style={styles.statValue}>
               {totalPlants.toLocaleString()}
@@ -510,6 +515,11 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
             ]}
             onPress={() => setSelectedTab('materiali')}
           >
+            {pendingMaterials.length > 0 ? (
+              <View style={[styles.pendingBadge, { backgroundColor: theme.warning }]}>
+                <ThemedText style={styles.pendingBadgeText}>{pendingMaterials.length}</ThemedText>
+              </View>
+            ) : null}
             <Feather name="package" size={20} color="#795548" />
             <ThemedText type="h3" style={styles.statValue}>
               {totalMaterials}
@@ -544,93 +554,85 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
           </Pressable>
         </View>
 
-        {pendingLines.length > 0 ? (
-          <>
-            <Spacer height={Spacing.md} />
-            <Pressable
-              style={[styles.pendingBanner, { backgroundColor: theme.warning + '20', borderColor: theme.warning }]}
-              onPress={() => setShowPending(!showPending)}
-            >
-              <Feather name="inbox" size={18} color={theme.warning} />
-              <ThemedText style={{ flex: 1, marginLeft: Spacing.sm }}>
-                {pendingLines.length} righe fattura in attesa di conferma
-              </ThemedText>
-              <Feather name={showPending ? "chevron-up" : "chevron-down"} size={20} color={theme.warning} />
-            </Pressable>
-          </>
-        ) : null}
-
-        {showPending && pendingLines.length > 0 ? (
-          <>
-            <Spacer height={Spacing.md} />
-            {pendingLines.map((line) => {
-              const catConfig = CATEGORY_CONFIG[line.assignedCategory];
-              
-              return (
-                <View
-                  key={line.id}
-                  style={[styles.pendingCard, { backgroundColor: theme.backgroundDefault }]}
-                >
-                  <View style={styles.lineHeader}>
-                    <View style={[styles.categoryBadge, { backgroundColor: catConfig.color + '20' }]}>
-                      <Feather name={catConfig.icon as any} size={14} color={catConfig.color} />
-                      <ThemedText style={[styles.categoryText, { color: catConfig.color }]}>
-                        {catConfig.label}
-                      </ThemedText>
-                    </View>
-                  </View>
-
-                  <Spacer height={Spacing.sm} />
-
-                  <ThemedText style={styles.lineDescription} numberOfLines={2}>
-                    {line.description}
-                  </ThemedText>
-
-                  <ThemedText style={[styles.invoiceRef, { color: theme.textSecondary }]}>
-                    Qta: {line.quantity} - {line.totalPrice.toFixed(2)} EUR
-                  </ThemedText>
-
-                  <Spacer height={Spacing.md} />
-
-                  <View style={styles.actionRow}>
-                    <Pressable
-                      style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
-                      onPress={() => {
-                        setSelectedLine(line);
-                        setModalVisible(true);
-                      }}
-                    >
-                      <Feather name="edit-2" size={16} color={theme.text} />
-                      <ThemedText style={styles.actionText}>Cambia</ThemedText>
-                    </Pressable>
-
-                    <Pressable
-                      style={[styles.actionButton, { backgroundColor: theme.success + '20' }]}
-                      onPress={() => handleConfirmLine(line)}
-                    >
-                      <Feather name="check" size={16} color={theme.success} />
-                      <ThemedText style={[styles.actionText, { color: theme.success }]}>
-                        Conferma
-                      </ThemedText>
-                    </Pressable>
-
-                    <Pressable
-                      style={[styles.actionButton, { backgroundColor: theme.error + '20' }]}
-                      onPress={() => handleDeleteLine(line)}
-                    >
-                      <Feather name="trash-2" size={16} color={theme.error} />
-                    </Pressable>
-                  </View>
-                </View>
-              );
-            })}
-          </>
-        ) : null}
-
-        <Spacer height={Spacing.xl} />
+        <Spacer height={Spacing.md} />
 
         {selectedTab === 'piante' ? (
           <>
+            {pendingPlants.length > 0 ? (
+              <>
+                <View style={styles.sectionHeaderRow}>
+                  <View>
+                    <ThemedText type="h4" style={[styles.sectionTitle, { color: theme.warning }]}>
+                      {pendingPlants.length} Righe in Attesa
+                    </ThemedText>
+                    <ThemedText style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                      Conferma per aggiungere a Piante/Semi
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    style={[styles.addButton, { backgroundColor: theme.warning }]}
+                    onPress={() => handleConfirmAllPending(pendingPlants)}
+                  >
+                    <Feather name="check-circle" size={18} color="#FFFFFF" />
+                    <ThemedText style={styles.addButtonText}>Conferma Tutto</ThemedText>
+                  </Pressable>
+                </View>
+                <Spacer height={Spacing.sm} />
+                {pendingPlants.map((line) => {
+                  const catConfig = CATEGORY_CONFIG[line.assignedCategory];
+                  return (
+                    <View
+                      key={line.id}
+                      style={[styles.pendingCard, { backgroundColor: theme.backgroundDefault }]}
+                    >
+                      <View style={styles.lineHeader}>
+                        <View style={[styles.categoryBadge, { backgroundColor: catConfig.color + '20' }]}>
+                          <Feather name={catConfig.icon as any} size={14} color={catConfig.color} />
+                          <ThemedText style={[styles.categoryText, { color: catConfig.color }]}>
+                            {catConfig.label}
+                          </ThemedText>
+                        </View>
+                      </View>
+                      <Spacer height={Spacing.sm} />
+                      <ThemedText style={styles.lineDescription} numberOfLines={2}>
+                        {line.description}
+                      </ThemedText>
+                      <ThemedText style={[styles.invoiceRef, { color: theme.textSecondary }]}>
+                        Qta: {line.quantity} - {line.totalPrice.toFixed(2)} EUR
+                      </ThemedText>
+                      <Spacer height={Spacing.md} />
+                      <View style={styles.actionRow}>
+                        <Pressable
+                          style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+                          onPress={() => {
+                            setSelectedLine(line);
+                            setModalVisible(true);
+                          }}
+                        >
+                          <Feather name="edit-2" size={16} color={theme.text} />
+                          <ThemedText style={styles.actionText}>Cambia</ThemedText>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.actionButton, { backgroundColor: theme.success + '20' }]}
+                          onPress={() => handleConfirmLine(line)}
+                        >
+                          <Feather name="check" size={16} color={theme.success} />
+                          <ThemedText style={[styles.actionText, { color: theme.success }]}>Conferma</ThemedText>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.actionButton, { backgroundColor: theme.error + '20' }]}
+                          onPress={() => handleDeleteLine(line)}
+                        >
+                          <Feather name="trash-2" size={16} color={theme.error} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })}
+                <Spacer height={Spacing.lg} />
+              </>
+            ) : null}
+
             <View style={styles.sectionHeaderRow}>
               <View>
                 <ThemedText type="h4" style={styles.sectionTitle}>
@@ -761,6 +763,81 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
           </>
         ) : (
           <>
+            {pendingMaterials.length > 0 ? (
+              <>
+                <View style={styles.sectionHeaderRow}>
+                  <View>
+                    <ThemedText type="h4" style={[styles.sectionTitle, { color: theme.warning }]}>
+                      {pendingMaterials.length} Righe in Attesa
+                    </ThemedText>
+                    <ThemedText style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                      Conferma per aggiungere a Materiali
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    style={[styles.addButton, { backgroundColor: theme.warning }]}
+                    onPress={() => handleConfirmAllPending(pendingMaterials)}
+                  >
+                    <Feather name="check-circle" size={18} color="#FFFFFF" />
+                    <ThemedText style={styles.addButtonText}>Conferma Tutto</ThemedText>
+                  </Pressable>
+                </View>
+                <Spacer height={Spacing.sm} />
+                {pendingMaterials.map((line) => {
+                  const catConfig = CATEGORY_CONFIG[line.assignedCategory];
+                  return (
+                    <View
+                      key={line.id}
+                      style={[styles.pendingCard, { backgroundColor: theme.backgroundDefault }]}
+                    >
+                      <View style={styles.lineHeader}>
+                        <View style={[styles.categoryBadge, { backgroundColor: catConfig.color + '20' }]}>
+                          <Feather name={catConfig.icon as any} size={14} color={catConfig.color} />
+                          <ThemedText style={[styles.categoryText, { color: catConfig.color }]}>
+                            {catConfig.label}
+                          </ThemedText>
+                        </View>
+                      </View>
+                      <Spacer height={Spacing.sm} />
+                      <ThemedText style={styles.lineDescription} numberOfLines={2}>
+                        {line.description}
+                      </ThemedText>
+                      <ThemedText style={[styles.invoiceRef, { color: theme.textSecondary }]}>
+                        Qta: {line.quantity} - {line.totalPrice.toFixed(2)} EUR
+                      </ThemedText>
+                      <Spacer height={Spacing.md} />
+                      <View style={styles.actionRow}>
+                        <Pressable
+                          style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+                          onPress={() => {
+                            setSelectedLine(line);
+                            setModalVisible(true);
+                          }}
+                        >
+                          <Feather name="edit-2" size={16} color={theme.text} />
+                          <ThemedText style={styles.actionText}>Cambia</ThemedText>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.actionButton, { backgroundColor: theme.success + '20' }]}
+                          onPress={() => handleConfirmLine(line)}
+                        >
+                          <Feather name="check" size={16} color={theme.success} />
+                          <ThemedText style={[styles.actionText, { color: theme.success }]}>Conferma</ThemedText>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.actionButton, { backgroundColor: theme.error + '20' }]}
+                          onPress={() => handleDeleteLine(line)}
+                        >
+                          <Feather name="trash-2" size={16} color={theme.error} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })}
+                <Spacer height={Spacing.lg} />
+              </>
+            ) : null}
+
             <ThemedText type="h4" style={styles.sectionTitle}>
               Materiali per Tipo
             </ThemedText>
@@ -1389,5 +1466,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  pendingBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  pendingBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
