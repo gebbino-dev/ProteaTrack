@@ -21,6 +21,7 @@ import {
 import { inventoryStore, MaterialRecord } from "@/utils/inventoryStore";
 import { storage } from "@/utils/storage";
 import { plantWarehouse, GenusGroup, PlantLot, cleanVarietyForSaving } from "@/utils/plantWarehouse";
+import { inventoryMovements, ItemType } from "@/utils/inventoryMovements";
 import { LavoroStackParamList } from "@/navigation/LavoroStackNavigator";
 import { PlantRecord } from "@/types";
 
@@ -168,15 +169,32 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
           sourceDocument: sourceDoc,
           notes: `Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`,
         });
+        await inventoryMovements.recordEntry(
+          'pianta',
+          cleanedVariety,
+          line.quantity,
+          line.invoiceDate,
+          sourceDoc,
+          `Fornitore: ${line.supplierName}`
+        );
       } else if (category === 'semi') {
         const cleanedVariety = cleanVarietyForSaving(line.description);
+        const seedName = `[Semi] ${cleanedVariety}`;
         await storage.savePlantRecord({
-          variety: `[Semi] ${cleanedVariety}`,
+          variety: seedName,
           quantity: line.quantity,
           arrivalDate: line.invoiceDate,
           sourceDocument: sourceDoc,
           notes: `SEMI. Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`,
         });
+        await inventoryMovements.recordEntry(
+          'seme',
+          cleanedVariety,
+          line.quantity,
+          line.invoiceDate,
+          sourceDoc,
+          `Fornitore: ${line.supplierName}`
+        );
       } else if (category === 'fitofarmaco' || category === 'fertilizzante') {
         await storage.saveProduct({
           name: line.description,
@@ -187,6 +205,14 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
           fracCode: '',
           notes: `Importato: ${sourceDoc}. Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR`,
         });
+        await inventoryMovements.recordEntry(
+          'materiale',
+          line.description,
+          line.quantity,
+          line.invoiceDate,
+          sourceDoc,
+          `${category}. Fornitore: ${line.supplierName}`
+        );
       } else if (['vasi', 'terriccio', 'materiale', 'altro'].includes(category)) {
         await inventoryStore.saveMaterial({
           name: line.description,
@@ -199,6 +225,14 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
           arrivalDate: line.invoiceDate,
           notes: `Fornitore: ${line.supplierName}`,
         });
+        await inventoryMovements.recordEntry(
+          'materiale',
+          line.description,
+          line.quantity,
+          line.invoiceDate,
+          sourceDoc,
+          `${category}. Fornitore: ${line.supplierName}`
+        );
       } else if (category === 'utenza') {
         await inventoryStore.saveMaterial({
           name: line.description,
@@ -211,6 +245,14 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
           arrivalDate: line.invoiceDate,
           notes: `UTENZA. Fornitore: ${line.supplierName}`,
         });
+        await inventoryMovements.recordEntry(
+          'materiale',
+          line.description,
+          1,
+          line.invoiceDate,
+          sourceDoc,
+          `Utenza. Fornitore: ${line.supplierName}`
+        );
       }
       return true;
     } catch (error) {
@@ -440,16 +482,28 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
         </View>
 
         <Spacer height={Spacing.md} />
-        <Pressable
-          style={[styles.filterButton, { backgroundColor: theme.primary + '15' }]}
-          onPress={() => navigation.navigate('CategoriaFilter')}
-        >
-          <Feather name="filter" size={18} color={theme.primary} />
-          <ThemedText style={{ flex: 1, marginLeft: Spacing.sm, color: theme.primary }}>
-            Filtra righe per categoria
-          </ThemedText>
-          <Feather name="chevron-right" size={20} color={theme.primary} />
-        </Pressable>
+        <View style={styles.buttonRow}>
+          <Pressable
+            style={[styles.filterButton, { backgroundColor: theme.primary + '15', flex: 1 }]}
+            onPress={() => navigation.navigate('CategoriaFilter')}
+          >
+            <Feather name="filter" size={18} color={theme.primary} />
+            <ThemedText style={{ flex: 1, marginLeft: Spacing.sm, color: theme.primary }}>
+              Filtra categorie
+            </ThemedText>
+            <Feather name="chevron-right" size={20} color={theme.primary} />
+          </Pressable>
+          <Pressable
+            style={[styles.filterButton, { backgroundColor: theme.success + '15', flex: 1 }]}
+            onPress={() => navigation.navigate('InventorySnapshot')}
+          >
+            <Feather name="bar-chart-2" size={18} color={theme.success} />
+            <ThemedText style={{ flex: 1, marginLeft: Spacing.sm, color: theme.success }}>
+              Giacenze
+            </ThemedText>
+            <Feather name="chevron-right" size={20} color={theme.success} />
+          </Pressable>
+        </View>
 
         {pendingLines.length > 0 ? (
           <>
@@ -1242,6 +1296,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '500',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
   },
   sectionHeaderRow: {
     flexDirection: 'row',

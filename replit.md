@@ -250,3 +250,11 @@ File correlati: `utils/eventAggregator.ts`, `screens/CalendarScreen.tsx`
 - Pulsanti rapidi: Mese, Trimestre, Da inizio anno, Anno intero
 - Modal con griglia mesi per selezione manuale
 - Filtra tutti i dati: transazioni, attività, trattamenti
+
+### Sistema Movimenti Inventario e Giacenze
+- **Tracciamento movimenti**: ogni conferma riga fattura crea un movimento di entrata con data fattura
+- **Tipi movimento**: entrata/uscita per piante, semi, materiali
+- **Giacenze fine anno**: calcolo automatico delle scorte al 31/12 di ogni anno
+- **Riepilogo mensile**: griglia con entrate/uscite per mese
+- **File correlati**: `utils/inventoryMovements.ts`, `screens/InventorySnapshotScreen.tsx`
+- **Navigazione**: Magazzino → Pulsante "Giacenze" → InventorySnapshotScreen

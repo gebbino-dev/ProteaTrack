@@ -5,6 +5,7 @@ import RecordActivityScreen from "@/screens/RecordActivityScreen";
 import ActivityDetailScreen from "@/screens/ActivityDetailScreen";
 import EditActivityScreen from "@/screens/EditActivityScreen";
 import CategoriaFilterScreen from "@/screens/CategoriaFilterScreen";
+import InventorySnapshotScreen from "@/screens/InventorySnapshotScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
 import { getCommonScreenOptions } from "@/navigation/screenOptions";
@@ -19,6 +20,7 @@ export type LavoroStackParamList = {
   ActivityDetail: { activityId: string };
   EditActivity: { activityId: string };
   CategoriaFilter: undefined;
+  InventorySnapshot: undefined;
 };
 
 const Stack = createNativeStackNavigator<LavoroStackParamList>();
@@ -67,6 +69,13 @@ export default function LavoroStackNavigator() {
         component={CategoriaFilterScreen}
         options={{
           headerTitle: "Filtra per Categoria",
+        }}
+      />
+      <Stack.Screen
+        name="InventorySnapshot"
+        component={InventorySnapshotScreen}
+        options={{
+          headerTitle: "Giacenze Fine Anno",
         }}
       />
     </Stack.Navigator>
