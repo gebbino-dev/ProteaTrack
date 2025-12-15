@@ -433,6 +433,45 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
 
   const categories = Object.keys(CATEGORY_CONFIG) as ItemCategory[];
 
+  const pendingPlants = pendingLines.filter(l => l.assignedCategory === 'piante' || l.assignedCategory === 'semi');
+  const pendingMaterials = pendingLines.filter(l => !['piante', 'semi'].includes(l.assignedCategory));
+
+  const handleConfirmAllPending = async (lines: PendingInvoiceLine[]) => {
+    const confirmAction = async () => {
+      let successCount = 0;
+      for (const line of lines) {
+        try {
+          const success = await processLineToInventory(line);
+          if (success) {
+            await pendingInvoiceStore.markAsProcessed(line.id);
+            successCount++;
+          }
+        } catch (error) {
+          console.error("Error confirming line:", error);
+        }
+      }
+      loadData();
+      if (Platform.OS !== 'web') {
+        Alert.alert("Completato", `${successCount} righe confermate con successo`);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm(`Confermare tutte le ${lines.length} righe?`)) {
+        confirmAction();
+      }
+    } else {
+      Alert.alert(
+        "Conferma Tutto",
+        `Confermare tutte le ${lines.length} righe?`,
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: "Conferma", onPress: confirmAction },
+        ]
+      );
+    }
+  };
+
   return (
     <ThemedView style={styles.container}>
       <ScreenScrollView
