@@ -24,6 +24,7 @@ import { plantWarehouse, GenusGroup, PlantLot } from "@/utils/plantWarehouse";
 import { LavoroStackParamList } from "@/navigation/LavoroStackNavigator";
 import { PlantRecord } from "@/types";
 import { processLineToInventory } from "@/services/applyPendingLinesToInventory";
+import { classificaTutteLeRighe } from "@/utils/autoCategorizationService";
 
 type MagazzinoScreenProps = {
   navigation: NativeStackNavigationProp<LavoroStackParamList, "Lavoro">;
@@ -78,6 +79,7 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
     arrivalDate: new Date().toISOString().split('T')[0],
     notes: '',
   });
+  const [reclassifying, setReclassifying] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -331,6 +333,40 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
   const materialCategories = ['vasi', 'terriccio', 'materiale', 'altro'];
   const pendingMaterials = pendingLines.filter(l => materialCategories.includes(l.assignedCategory));
 
+  const handleReclassifyAll = async () => {
+    setReclassifying(true);
+    try {
+      const stats = await classificaTutteLeRighe();
+      await loadData();
+      
+      const message = `Riclassificate ${stats.righeClassificate} righe:\n` +
+        `- Piante: ${stats.perCategoria.piante}\n` +
+        `- Semi: ${stats.perCategoria.semi}\n` +
+        `- Terriccio: ${stats.perCategoria.terriccio}\n` +
+        `- Vasi: ${stats.perCategoria.vasi}\n` +
+        `- Fitofarmaci: ${stats.perCategoria.fitofarmaci}\n` +
+        `- Fertilizzanti: ${stats.perCategoria.fertilizzanti}\n` +
+        `- Utenze: ${stats.perCategoria.utenze}\n` +
+        `- Altro: ${stats.perCategoria.materiale_generico}`;
+      
+      if (Platform.OS === 'web') {
+        alert(message);
+      } else {
+        Alert.alert('Riclassificazione Completata', message);
+      }
+    } catch (error) {
+      console.error('Errore riclassificazione:', error);
+      const errMsg = `Errore durante la riclassificazione: ${error}`;
+      if (Platform.OS === 'web') {
+        alert(errMsg);
+      } else {
+        Alert.alert('Errore', errMsg);
+      }
+    } finally {
+      setReclassifying(false);
+    }
+  };
+
   const handleConfirmAllPending = async (lines: PendingInvoiceLine[]) => {
     const confirmAction = async () => {
       let successCount = 0;
@@ -448,6 +484,29 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
             <Feather name="chevron-right" size={20} color={theme.success} />
           </Pressable>
         </View>
+
+        {pendingLines.length > 0 ? (
+          <>
+            <Spacer height={Spacing.sm} />
+            <Pressable
+              style={[
+                styles.filterButton, 
+                { 
+                  backgroundColor: reclassifying ? theme.warning + '30' : theme.warning + '15',
+                  opacity: reclassifying ? 0.7 : 1,
+                }
+              ]}
+              onPress={handleReclassifyAll}
+              disabled={reclassifying}
+            >
+              <Feather name="refresh-cw" size={18} color={theme.warning} />
+              <ThemedText style={{ flex: 1, marginLeft: Spacing.sm, color: theme.warning }}>
+                {reclassifying ? 'Riclassificazione in corso...' : `Riclassifica Tutte (${pendingLines.length})`}
+              </ThemedText>
+              <Feather name="zap" size={20} color={theme.warning} />
+            </Pressable>
+          </>
+        ) : null}
 
         <Spacer height={Spacing.md} />
 
