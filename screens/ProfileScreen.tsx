@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, StyleSheet, TextInput, Alert, Pressable, Platform } from "react-native";
+import { View, StyleSheet, TextInput, Alert, Pressable, Platform, ScrollView } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -15,6 +15,8 @@ import { backupService } from "@/utils/backupService";
 import { storageDebug } from "@/utils/storageDebug";
 import { UserSettings } from "@/types";
 import type { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
+import { userCategorizationRulesStore, UserCategorizationRule } from "@/utils/userCategorizationRules";
+import { ItemCategory, CATEGORY_CONFIG } from "@/utils/pendingInvoiceStore";
 
 type ProfileScreenProps = {
   navigation: NativeStackNavigationProp<ProfileStackParamList, "Profile">;
@@ -42,14 +44,21 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     totalActivities: 0,
     benchesWithPlants: 0,
   });
+  const [userRules, setUserRules] = useState<UserCategorizationRule[]>([]);
+  const [newRuleKeyword, setNewRuleKeyword] = useState('');
+  const [newRuleCategory, setNewRuleCategory] = useState<ItemCategory>('piante');
+  const [newRuleVariety, setNewRuleVariety] = useState('');
+  const [newRuleSpecies, setNewRuleSpecies] = useState('');
+  const [showRulesSection, setShowRulesSection] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       const loadData = async () => {
-        const [savedSettings, statsData, debugData] = await Promise.all([
+        const [savedSettings, statsData, debugData, rules] = await Promise.all([
           storage.getSettings(),
           storage.getStats(),
           storageDebug.checkDataExists(),
+          userCategorizationRulesStore.getRules(),
         ]);
         setSettings(savedSettings);
         setStats({
@@ -58,6 +67,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           benchesWithPlants: statsData.benchesWithPlants,
         });
         setDebugInfo(debugData);
+        setUserRules(rules);
       };
       loadData();
     }, [])
@@ -238,6 +248,87 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       Alert.alert('Errore', `Dump fallito: ${error}`);
     }
   };
+
+  const handleAddRule = async () => {
+    if (!newRuleKeyword.trim()) {
+      Alert.alert('Errore', 'Inserisci una keyword');
+      return;
+    }
+    
+    try {
+      const newRule = await userCategorizationRulesStore.saveRule({
+        keyword: newRuleKeyword.trim().toLowerCase(),
+        itemCategory: newRuleCategory,
+        forcedVariety: newRuleVariety.trim() || undefined,
+        forcedSpecies: newRuleSpecies.trim() || undefined,
+      });
+      
+      setUserRules([...userRules, newRule]);
+      setNewRuleKeyword('');
+      setNewRuleVariety('');
+      setNewRuleSpecies('');
+      Alert.alert('Successo', `Regola "${newRule.keyword}" salvata`);
+    } catch (error) {
+      Alert.alert('Errore', `Impossibile salvare la regola: ${error}`);
+    }
+  };
+
+  const handleDeleteRule = async (ruleId: string, keyword: string) => {
+    const doDelete = async () => {
+      await userCategorizationRulesStore.deleteRule(ruleId);
+      setUserRules(userRules.filter(r => r.id !== ruleId));
+    };
+    
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Eliminare la regola "${keyword}"?`)) {
+        await doDelete();
+      }
+    } else {
+      Alert.alert(
+        'Conferma',
+        `Eliminare la regola "${keyword}"?`,
+        [
+          { text: 'Annulla', style: 'cancel' },
+          { text: 'Elimina', style: 'destructive', onPress: doDelete },
+        ]
+      );
+    }
+  };
+
+  const handleClearAllRules = async () => {
+    const doClear = async () => {
+      await userCategorizationRulesStore.clearRules();
+      setUserRules([]);
+      Alert.alert('Completato', 'Tutte le regole eliminate');
+    };
+    
+    if (Platform.OS === 'web') {
+      if (window.confirm('Eliminare tutte le regole di categorizzazione?')) {
+        await doClear();
+      }
+    } else {
+      Alert.alert(
+        'Conferma',
+        'Eliminare tutte le regole di categorizzazione?',
+        [
+          { text: 'Annulla', style: 'cancel' },
+          { text: 'Elimina Tutte', style: 'destructive', onPress: doClear },
+        ]
+      );
+    }
+  };
+
+  const categoryOptions: { value: ItemCategory; label: string }[] = [
+    { value: 'piante', label: 'Piante' },
+    { value: 'semi', label: 'Semi' },
+    { value: 'vasi', label: 'Vasi' },
+    { value: 'terriccio', label: 'Terriccio' },
+    { value: 'fitofarmaco', label: 'Fitofarmaci' },
+    { value: 'fertilizzante', label: 'Fertilizzanti' },
+    { value: 'materiale', label: 'Materiale' },
+    { value: 'utenza', label: 'Utenze' },
+    { value: 'altro', label: 'Altro' },
+  ];
 
   const inputStyle = [
     styles.input,
@@ -562,6 +653,189 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         </ThemedText>
       </Pressable>
 
+      <Spacer height={Spacing["3xl"]} />
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.saveButton,
+          {
+            backgroundColor: showRulesSection ? theme.primary : theme.backgroundDefault,
+            borderWidth: showRulesSection ? 0 : 1,
+            borderColor: theme.primary,
+            opacity: pressed ? 0.8 : 1,
+          },
+        ]}
+        onPress={() => setShowRulesSection(!showRulesSection)}
+      >
+        <Feather name="sliders" size={20} color={showRulesSection ? '#FFFFFF' : theme.primary} />
+        <ThemedText style={[styles.saveButtonText, { color: showRulesSection ? '#FFFFFF' : theme.primary }]}>
+          Regole di Categorizzazione ({userRules.length})
+        </ThemedText>
+        <Feather name={showRulesSection ? 'chevron-up' : 'chevron-down'} size={20} color={showRulesSection ? '#FFFFFF' : theme.primary} />
+      </Pressable>
+
+      {showRulesSection ? (
+        <View style={{ marginTop: Spacing.lg }}>
+          <View style={[styles.debugCard, { backgroundColor: theme.backgroundDefault }]}>
+            <ThemedText style={{ fontWeight: '600', fontSize: 16, marginBottom: Spacing.md }}>
+              Aggiungi Regola
+            </ThemedText>
+
+            <View style={styles.fieldContainer}>
+              <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+                Keyword (parola chiave)
+              </ThemedText>
+              <TextInput
+                style={inputStyle}
+                value={newRuleKeyword}
+                onChangeText={setNewRuleKeyword}
+                placeholder="es. protea, leucospermum, terriccio"
+                placeholderTextColor={theme.textSecondary}
+                autoCapitalize="none"
+              />
+            </View>
+
+            <Spacer height={Spacing.md} />
+
+            <View style={styles.fieldContainer}>
+              <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+                Categoria
+              </ThemedText>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs }}>
+                {categoryOptions.map(opt => (
+                  <Pressable
+                    key={opt.value}
+                    style={[
+                      styles.categoryChip,
+                      {
+                        backgroundColor: newRuleCategory === opt.value ? theme.primary : theme.backgroundSecondary,
+                      },
+                    ]}
+                    onPress={() => setNewRuleCategory(opt.value)}
+                  >
+                    <ThemedText style={{ 
+                      fontSize: 12, 
+                      color: newRuleCategory === opt.value ? '#FFFFFF' : theme.text,
+                    }}>
+                      {opt.label}
+                    </ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {(newRuleCategory === 'piante' || newRuleCategory === 'semi') ? (
+              <>
+                <Spacer height={Spacing.md} />
+                <View style={styles.fieldContainer}>
+                  <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+                    Varieta forzata (opzionale)
+                  </ThemedText>
+                  <TextInput
+                    style={inputStyle}
+                    value={newRuleVariety}
+                    onChangeText={setNewRuleVariety}
+                    placeholder="es. Leucospermum cordifolium"
+                    placeholderTextColor={theme.textSecondary}
+                  />
+                </View>
+
+                <Spacer height={Spacing.md} />
+                <View style={styles.fieldContainer}>
+                  <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+                    Specie forzata (opzionale)
+                  </ThemedText>
+                  <TextInput
+                    style={inputStyle}
+                    value={newRuleSpecies}
+                    onChangeText={setNewRuleSpecies}
+                    placeholder="es. Leucospermum"
+                    placeholderTextColor={theme.textSecondary}
+                  />
+                </View>
+              </>
+            ) : null}
+
+            <Spacer height={Spacing.lg} />
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.saveButton,
+                {
+                  backgroundColor: theme.activityWatering,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+              onPress={handleAddRule}
+            >
+              <Feather name="plus" size={20} color="#FFFFFF" />
+              <ThemedText style={styles.saveButtonText}>
+                Salva Regola
+              </ThemedText>
+            </Pressable>
+          </View>
+
+          {userRules.length > 0 ? (
+            <View style={[styles.debugCard, { backgroundColor: theme.backgroundDefault, marginTop: Spacing.lg }]}>
+              <ThemedText style={{ fontWeight: '600', fontSize: 16, marginBottom: Spacing.md }}>
+                Regole Attive ({userRules.length})
+              </ThemedText>
+
+              {userRules.map(rule => (
+                <View 
+                  key={rule.id} 
+                  style={[
+                    styles.ruleItem,
+                    { borderBottomColor: theme.backgroundSecondary },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={{ fontWeight: '600' }}>
+                      "{rule.keyword}" {'->'} {CATEGORY_CONFIG[rule.itemCategory]?.label || rule.itemCategory}
+                    </ThemedText>
+                    {rule.forcedVariety ? (
+                      <ThemedText style={{ fontSize: 12, color: theme.textSecondary }}>
+                        Varieta: {rule.forcedVariety}
+                      </ThemedText>
+                    ) : null}
+                    {rule.forcedSpecies ? (
+                      <ThemedText style={{ fontSize: 12, color: theme.textSecondary }}>
+                        Specie: {rule.forcedSpecies}
+                      </ThemedText>
+                    ) : null}
+                  </View>
+                  <Pressable
+                    onPress={() => handleDeleteRule(rule.id, rule.keyword)}
+                    style={{ padding: Spacing.sm }}
+                  >
+                    <Feather name="trash-2" size={18} color={theme.error} />
+                  </Pressable>
+                </View>
+              ))}
+
+              <Spacer height={Spacing.lg} />
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.dangerButton,
+                  {
+                    backgroundColor: theme.backgroundDefault,
+                    borderColor: theme.error,
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+                onPress={handleClearAllRules}
+              >
+                <Feather name="trash" size={18} color={theme.error} />
+                <ThemedText style={[styles.dangerButtonText, { color: theme.error }]}>
+                  Elimina Tutte le Regole
+                </ThemedText>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
       <Spacer height={Spacing["2xl"]} />
 
       <View style={[styles.infoCard, { backgroundColor: theme.backgroundDefault }]}>
@@ -660,5 +934,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  categoryChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.xs,
+  },
+  ruleItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
   },
 });

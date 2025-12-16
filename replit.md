@@ -44,6 +44,13 @@ Displays aggregated events from all modules: Activities, Treatments, Transaction
 ### Automatic Invoice Line Classification
 -   **Categories**: `utenze` (utilities), `piante` (plants), `semi` (seeds), `terriccio` (soil), `vasi` (pots), `fitofarmaci` (pesticides), `fertilizzanti` (fertilizers), `combustibile` (fuel), `materiale_generico` (general material).
 -   **Functionality**: Automatic classification on import, batch update, UI filters for categories and utility subcategories.
+-   **User Categorization Rules** (`utils/userCategorizationRules.ts`):
+    -   User-defined keyword-based rules with PRIORITY over automatic classification.
+    -   Each rule contains: `keyword`, `itemCategory`, optional `forcedVariety`, `forcedSpecies`.
+    -   When a keyword matches (case-insensitive), the rule's category and forced variety/species are applied.
+    -   Rules are stored in AsyncStorage (`serra_user_categorization_rules`).
+    -   UI to manage rules is in ProfileScreen under "Regole di Categorizzazione".
+    -   Flow: `classificaRigaConRegoleUtente()` checks user rules first -> falls back to automatic classification.
 
 ### Inventory Movements and Stock
 -   Tracks inventory movements (entry/exit) for plants, seeds, and materials.
