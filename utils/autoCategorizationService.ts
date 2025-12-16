@@ -70,6 +70,26 @@ export const SOTTOCATEGORIA_UTENZA_CONFIG: Record<string, { label: string; color
   '': { label: 'Non specificata', color: '#9E9E9E' },
 };
 
+export const AUTO_KEYWORDS: Record<CategoriaRiga, string[]> = {
+  utenze: [],
+  piante: ['protea', 'leucospermum', 'serruria', 'telopea', 'leucadendron', 'banksia', 'grevillea', 'pianta', 'piante', 'piantina', 'piantine', 'talea', 'talee'],
+  semi: ['seme', 'semi', 'seeds', 'sementi'],
+  terriccio: ['terriccio', 'substrato', 'torba', 'perlite', 'vermiculite', 'fibra di cocco', 'bark'],
+  vasi: ['vaso', 'vasi', 'contenitore', 'contenitori', 'plateau', 'alveolare', 'alveoli', 'vassoio', 'placca', 'placche'],
+  fitofarmaci: ['fitofarmaco', 'agrofarmaco', 'fungicida', 'insetticida', 'acaricida', 'erbicida', 'antiparassitario', 'nematocida', 'molluschicida', 'rodenticida', '-clp-', 'decis', 'previter', 'affirm', 'karate', 'roundup', 'costar', 'katar', 'neem', 'confidor', 'actara', 'movento', 'sivanto', 'teppeki', 'closer', 'epik', 'laser', 'success', 'spintor', 'spinetoram', 'switch', 'score', 'topas', 'folicur', 'tilt', 'amistar', 'ortiva', 'signum', 'luna', 'serenade', 'bion', 'aliette', 'ridomil', 'previcur', 'propamocarb', 'metalaxyl', 'mancozeb', 'metiram', 'rame', 'poltiglia', 'zolfo', 'pomarsol', 'dithane', 'ziram', 'thiram', 'captan', 'folpet', 'chlorpyrifos', 'piretro', 'piretrina', 'abamectina', 'emamectina', 'bacillus', 'trichoderma', 'beauveria', 'metarhizium'],
+  fertilizzanti: ['concime', 'fertilizzante', 'npk', 'stallatico', 'azoto', 'fosforo', 'potassio', 'solfato', 'urea', 'nitrato', 'ammonio', 'microelementi', 'chelato', 'biostimolante', 'kelpak', 'haifastim', 'alga', 'alghe'],
+  combustibile: ['gasolio', 'gasoil', 'gasolio agricolo', 'gpl', 'pellet', 'legna', 'combustibile', 'carburante', 'benzina', 'nafta'],
+  materiale_generico: [],
+};
+
+export const AUTO_KEYWORDS_UTENZE: Record<SottoCategoriaUtenza, string[]> = {
+  'spese_floratoscana': ['progetto sviluppo soci', 'fondo sviluppo soci', 'detrazione costo conferimento fiori', 'detrazione costo di servizio conf.fiori', 'costi amministrativi', 'sfuso_2', 'floratoscana', 'flora toscana', 'spese accessorie flora'],
+  'luce': ['energia elettrica', 'enel', 'kwh', 'elettrica', 'corrente elettrica', 'fornitura energia', 'consumo energia'],
+  'gas': ['metano', 'gas', 'gpl', 'fornitura gas', 'consumo gas', 'bolletta gas'],
+  'spese_cia': ['cia', 'confederazione italiana agricoltori', 'coldiretti', 'confagricoltura'],
+  '': [],
+};
+
 const FITOFARMACI_COMMERCIALI = [
   'decis', 'previter', 'affirm', 'karate', 'roundup', 'costar', 'katar', 
   'neem', 'confidor', 'actara', 'movento', 'sivanto', 'teppeki', 'closer',

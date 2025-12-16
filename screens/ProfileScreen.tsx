@@ -17,6 +17,7 @@ import { UserSettings } from "@/types";
 import type { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 import { userCategorizationRulesStore, UserCategorizationRule } from "@/utils/userCategorizationRules";
 import { ItemCategory, CATEGORY_CONFIG } from "@/utils/pendingInvoiceStore";
+import { AUTO_KEYWORDS, AUTO_KEYWORDS_UTENZE, CATEGORIA_CONFIG, SOTTOCATEGORIA_UTENZA_CONFIG, CategoriaRiga, SottoCategoriaUtenza } from "@/utils/autoCategorizationService";
 
 type ProfileScreenProps = {
   navigation: NativeStackNavigationProp<ProfileStackParamList, "Profile">;
@@ -47,6 +48,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [userRules, setUserRules] = useState<UserCategorizationRule[]>([]);
   const [newRuleKeyword, setNewRuleKeyword] = useState('');
   const [newRuleCategory, setNewRuleCategory] = useState<ItemCategory>('piante');
+  const [newRuleSubcategory, setNewRuleSubcategory] = useState<SottoCategoriaUtenza>('');
   const [newRuleVariety, setNewRuleVariety] = useState('');
   const [newRuleSpecies, setNewRuleSpecies] = useState('');
   const [showRulesSection, setShowRulesSection] = useState(false);
@@ -259,6 +261,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       const newRule = await userCategorizationRulesStore.saveRule({
         keyword: newRuleKeyword.trim().toLowerCase(),
         itemCategory: newRuleCategory,
+        sottoCategoriaUtenza: newRuleCategory === 'utenza' ? newRuleSubcategory : undefined,
         forcedVariety: newRuleVariety.trim() || undefined,
         forcedSpecies: newRuleSpecies.trim() || undefined,
       });
@@ -267,6 +270,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       setNewRuleKeyword('');
       setNewRuleVariety('');
       setNewRuleSpecies('');
+      setNewRuleSubcategory('');
       Alert.alert('Successo', `Regola "${newRule.keyword}" salvata`);
     } catch (error) {
       Alert.alert('Errore', `Impossibile salvare la regola: ${error}`);
@@ -678,7 +682,65 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         <View style={{ marginTop: Spacing.lg }}>
           <View style={[styles.debugCard, { backgroundColor: theme.backgroundDefault }]}>
             <ThemedText style={{ fontWeight: '600', fontSize: 16, marginBottom: Spacing.md }}>
-              Aggiungi Regola
+              Parole Chiave Automatiche
+            </ThemedText>
+            <ThemedText style={{ fontSize: 12, color: theme.textSecondary, marginBottom: Spacing.md }}>
+              Queste parole chiave sono gia riconosciute automaticamente. Le regole utente hanno PRIORITA su queste.
+            </ThemedText>
+
+            <ScrollView 
+              style={{ maxHeight: 300 }} 
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={true}
+            >
+              {(Object.keys(AUTO_KEYWORDS) as CategoriaRiga[]).map(categoria => {
+                const keywords = AUTO_KEYWORDS[categoria];
+                const config = CATEGORIA_CONFIG[categoria];
+                if (!keywords || keywords.length === 0) return null;
+                return (
+                  <View key={categoria} style={{ marginBottom: Spacing.md }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.xs }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: config.color, marginRight: Spacing.xs }} />
+                      <ThemedText style={{ fontWeight: '600', fontSize: 13 }}>
+                        {config.label}
+                      </ThemedText>
+                    </View>
+                    <ThemedText style={{ fontSize: 11, color: theme.textSecondary, lineHeight: 16 }}>
+                      {keywords.join(', ')}
+                    </ThemedText>
+                  </View>
+                );
+              })}
+
+              <View style={{ marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: theme.backgroundSecondary }}>
+                <ThemedText style={{ fontWeight: '600', fontSize: 14, marginBottom: Spacing.sm }}>
+                  Sottocategorie Utenze
+                </ThemedText>
+                {(Object.keys(AUTO_KEYWORDS_UTENZE) as SottoCategoriaUtenza[]).map(sottocategoria => {
+                  const keywords = AUTO_KEYWORDS_UTENZE[sottocategoria];
+                  const config = SOTTOCATEGORIA_UTENZA_CONFIG[sottocategoria];
+                  if (!keywords || keywords.length === 0 || sottocategoria === '') return null;
+                  return (
+                    <View key={sottocategoria} style={{ marginBottom: Spacing.md }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.xs }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: config.color, marginRight: Spacing.xs }} />
+                        <ThemedText style={{ fontWeight: '600', fontSize: 13 }}>
+                          {config.label}
+                        </ThemedText>
+                      </View>
+                      <ThemedText style={{ fontSize: 11, color: theme.textSecondary, lineHeight: 16 }}>
+                        {keywords.join(', ')}
+                      </ThemedText>
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+
+          <View style={[styles.debugCard, { backgroundColor: theme.backgroundDefault, marginTop: Spacing.lg }]}>
+            <ThemedText style={{ fontWeight: '600', fontSize: 16, marginBottom: Spacing.md }}>
+              Aggiungi Regola Personalizzata
             </ThemedText>
 
             <View style={styles.fieldContainer}>
@@ -723,6 +785,40 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 ))}
               </View>
             </View>
+
+            {newRuleCategory === 'utenza' ? (
+              <>
+                <Spacer height={Spacing.md} />
+                <View style={styles.fieldContainer}>
+                  <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+                    Sottocategoria Utenza
+                  </ThemedText>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs }}>
+                    {(Object.keys(SOTTOCATEGORIA_UTENZA_CONFIG) as SottoCategoriaUtenza[])
+                      .filter(k => k !== '')
+                      .map(subcat => (
+                      <Pressable
+                        key={subcat}
+                        style={[
+                          styles.categoryChip,
+                          {
+                            backgroundColor: newRuleSubcategory === subcat ? SOTTOCATEGORIA_UTENZA_CONFIG[subcat].color : theme.backgroundSecondary,
+                          },
+                        ]}
+                        onPress={() => setNewRuleSubcategory(subcat)}
+                      >
+                        <ThemedText style={{ 
+                          fontSize: 11, 
+                          color: newRuleSubcategory === subcat ? '#FFFFFF' : theme.text,
+                        }}>
+                          {SOTTOCATEGORIA_UTENZA_CONFIG[subcat].label}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              </>
+            ) : null}
 
             {(newRuleCategory === 'piante' || newRuleCategory === 'semi') ? (
               <>
@@ -792,6 +888,8 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                   <View style={{ flex: 1 }}>
                     <ThemedText style={{ fontWeight: '600' }}>
                       "{rule.keyword}" {'->'} {CATEGORY_CONFIG[rule.itemCategory]?.label || rule.itemCategory}
+                      {rule.sottoCategoriaUtenza && SOTTOCATEGORIA_UTENZA_CONFIG[rule.sottoCategoriaUtenza] ? 
+                        ` (${SOTTOCATEGORIA_UTENZA_CONFIG[rule.sottoCategoriaUtenza].label})` : ''}
                     </ThemedText>
                     {rule.forcedVariety ? (
                       <ThemedText style={{ fontSize: 12, color: theme.textSecondary }}>
