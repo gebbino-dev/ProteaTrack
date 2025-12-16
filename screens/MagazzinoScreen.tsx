@@ -20,10 +20,10 @@ import {
 } from "@/utils/pendingInvoiceStore";
 import { inventoryStore, MaterialRecord } from "@/utils/inventoryStore";
 import { storage } from "@/utils/storage";
-import { plantWarehouse, GenusGroup, PlantLot, cleanVarietyForSaving } from "@/utils/plantWarehouse";
-import { inventoryMovements, ItemType } from "@/utils/inventoryMovements";
+import { plantWarehouse, GenusGroup, PlantLot } from "@/utils/plantWarehouse";
 import { LavoroStackParamList } from "@/navigation/LavoroStackNavigator";
 import { PlantRecord } from "@/types";
+import { processLineToInventory } from "@/services/applyPendingLinesToInventory";
 
 type MagazzinoScreenProps = {
   navigation: NativeStackNavigationProp<LavoroStackParamList, "Lavoro">;
@@ -152,112 +152,6 @@ export default function MagazzinoScreen({ navigation }: MagazzinoScreenProps) {
       loadData();
     } catch (error) {
       console.error("Error updating material type:", error);
-    }
-  };
-
-  const processLineToInventory = async (line: PendingInvoiceLine): Promise<boolean> => {
-    const category = line.assignedCategory;
-    const sourceDoc = `${line.invoiceNumber} del ${line.invoiceDate}`;
-    
-    try {
-      if (category === 'piante') {
-        const cleanedVariety = cleanVarietyForSaving(line.description);
-        await storage.savePlantRecord({
-          variety: cleanedVariety,
-          quantity: line.quantity,
-          arrivalDate: line.invoiceDate,
-          sourceDocument: sourceDoc,
-          notes: `Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`,
-        });
-        await inventoryMovements.recordEntry(
-          'pianta',
-          cleanedVariety,
-          line.quantity,
-          line.invoiceDate,
-          sourceDoc,
-          `Fornitore: ${line.supplierName}`
-        );
-      } else if (category === 'semi') {
-        const cleanedVariety = cleanVarietyForSaving(line.description);
-        const seedName = `[Semi] ${cleanedVariety}`;
-        await storage.savePlantRecord({
-          variety: seedName,
-          quantity: line.quantity,
-          arrivalDate: line.invoiceDate,
-          sourceDocument: sourceDoc,
-          notes: `SEMI. Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`,
-        });
-        await inventoryMovements.recordEntry(
-          'seme',
-          cleanedVariety,
-          line.quantity,
-          line.invoiceDate,
-          sourceDoc,
-          `Fornitore: ${line.supplierName}`
-        );
-      } else if (category === 'fitofarmaco' || category === 'fertilizzante') {
-        await storage.saveProduct({
-          name: line.description,
-          activeIngredient: '',
-          formulation: line.unitOfMeasure || '',
-          registrationNumber: '',
-          phiDays: undefined,
-          fracCode: '',
-          notes: `Importato: ${sourceDoc}. Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR`,
-        });
-        await inventoryMovements.recordEntry(
-          'materiale',
-          line.description,
-          line.quantity,
-          line.invoiceDate,
-          sourceDoc,
-          `${category}. Fornitore: ${line.supplierName}`
-        );
-      } else if (['vasi', 'terriccio', 'materiale', 'altro'].includes(category)) {
-        await inventoryStore.saveMaterial({
-          name: line.description,
-          type: category as MaterialType,
-          quantity: line.quantity,
-          unitOfMeasure: line.unitOfMeasure || 'pz',
-          unitPrice: line.unitPrice,
-          totalPrice: line.totalPrice,
-          sourceDocument: sourceDoc,
-          arrivalDate: line.invoiceDate,
-          notes: `Fornitore: ${line.supplierName}`,
-        });
-        await inventoryMovements.recordEntry(
-          'materiale',
-          line.description,
-          line.quantity,
-          line.invoiceDate,
-          sourceDoc,
-          `${category}. Fornitore: ${line.supplierName}`
-        );
-      } else if (category === 'utenza') {
-        await inventoryStore.saveMaterial({
-          name: line.description,
-          type: 'altro',
-          quantity: 1,
-          unitOfMeasure: 'servizio',
-          unitPrice: line.totalPrice,
-          totalPrice: line.totalPrice,
-          sourceDocument: sourceDoc,
-          arrivalDate: line.invoiceDate,
-          notes: `UTENZA. Fornitore: ${line.supplierName}`,
-        });
-        await inventoryMovements.recordEntry(
-          'materiale',
-          line.description,
-          1,
-          line.invoiceDate,
-          sourceDoc,
-          `Utenza. Fornitore: ${line.supplierName}`
-        );
-      }
-      return true;
-    } catch (error) {
-      console.error("Error processing line to inventory:", error);
-      return false;
     }
   };
 

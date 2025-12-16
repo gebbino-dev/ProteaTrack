@@ -1,0 +1,146 @@
+Voglio consolidare l’architettura della mia app (vivaio / azienda agricola) in modo MODULARE e chiaro.  
+Adesso ho: import fatture XML, `pendingInvoiceStore`, magazzino piante, movimenti inventario, contabilità e gestione serre/bancali.  
+Le serre/bancali sono l’unica parte che considero strutturalmente corretta e vanno mantenute, ma vanno collegate meglio al flusso di ingresso piante.  
+C’è confusione su come i dati passano tra lettura fatture, filtri righe e classificazione.  
+Ti chiedo un refactoring MIRATO, con pochi flussi ben definiti, per ridurre la confusione e i costi di token.
+
+### 1. Moduli e responsabilità (senza stravolgere tutto)
+
+Organizza il codice in questi moduli logici (anche solo a livello di file/cartelle):
+
+1) **Import Fatture (`invoiceImport`)**  
+   Responsabile SOLO di:
+   - leggere XML SDI  
+   - creare un oggetto `ParsedInvoice`  
+   - generare righe “grezze” (`InventoryImportItem[]`) e salvarle come `PendingInvoiceLine` in `pendingInvoiceStore`  
+   - creare la transazione contabile di base con `inventoryStore.addTransaction`  
+
+   Importante: qui NON si deve scrivere direttamente né su `PlantInventory` né su serre/bancali.
+
+2) **Righe Pending / Classificazione (`pendingInvoiceStore` + UI Magazzino)**  
+   È la “coda di lavoro”:
+   - contiene tutte le righe fattura da classificare (piante, vasi, terriccio, utenze, …)  
+   - permette all’utente di filtrare per categoria e correggere `assignedCategory`  
+   - espone un’azione chiara “Applica righe al magazzino”, ma la logica di trasformazione sta in funzioni di servizio dedicate (vedi sotto), NON dentro la UI.
+
+3) **Inventario Piante & Movimenti (`storage` + `inventoryMovements`)**  
+   - `PlantInventory` tiene l’elenco dei lotti di piante (variety, species, quantity, arrivalDate, ecc.).  
+   - `inventoryMovements` registra tutte le ENTRATE/USCITE di magazzino (piante, semi, materiali) per report, snapshot, bilanci inventariali.  
+   - Qui devono arrivare i dati SOLO tramite funzioni di servizio (es. `applyPendingLinesToPlantInventory`), non direttamente dalle schermate.
+
+4) **Serre e Bancali (schema esistente da mantenere)**  
+   - Mantieni intatta l’attuale struttura di serre, settori e bancali (è l’unica parte che è già come voglio).  
+   - Serve però un collegamento chiaro: quando le piante entrano in magazzino (da fattura), devono essere assegnate a un **ciclo colturale** e, successivamente, a una o più posizioni in serra/bancali.
+
+5) **Contabilità (`inventoryStore` / transazioni)**  
+   - Registra solo aspetti economici (fatture, pagamenti, categorie di costo/ricavo).  
+   - Non deve aggiornare né inventario piante né serre/bancali: può solo salvare riferimenti documento e note.
+
+### 2. Concetto di “ciclo colturale” da collegare all’arrivo piante
+
+Voglio introdurre (anche in modo semplice, per ora) il concetto di **ciclo colturale**:
+
+- Le piante di “inizio ciclo” arrivano in un intervallo **da agosto a marzo/aprile dell’anno successivo**.  
+- Tutte le piante della stessa varietà che arrivano in questo range devono essere considerate appartenenti allo **stesso ciclo colturale** (es. ciclo 2025/26 per un certo Leucospermum).  
+
+Chiedo di:
+
+1. Aggiungere nei dati di ingresso (quando creo `PlantRecord`) almeno questi campi:
+   - `cycleKey` o simile (stringa) che identifichi il ciclo colturale, ad esempio `"Leucospermum cordifolium_2025-26"`.  
+   - Questo `cycleKey` si calcola a partire da:
+     - `variety` (da `extractVarietyFromDescription`)  
+     - `arrivalDate` → da cui ricavi l’anno di ciclo secondo la regola:  
+       - se la data è da agosto (08) a dicembre (12) → ciclo “anno / anno+1”  
+       - se la data è da gennaio (01) a aprile (04) → ciclo “anno-1 / anno”  
+   - Se per ora non vuoi mostrare il ciclo in UI, almeno salvalo nel record per usarlo dopo.
+
+2. Non modificare ancora la struttura di serre/bancali, ma preparare il terreno:
+   - ogni `PlantRecord` deve poter essere in futuro collegato a uno o più bancali (es. tramite `benchId` o un mapping separato).  
+   - per ora basta aggiungere un campo opzionale `location` o `benchRef?` nel `PlantRecord` (anche vuoto), in modo che non servano breaking changes dopo.
+
+### 3. Flussi dati standardizzati
+
+Voglio fissare una volta per tutte questi tre flussi:
+
+#### Flusso A – Import fattura → Pending
+
+Da `InvoiceImportScreen` / `invoiceImportService`:
+
+1. `parseInvoiceXml(xml) → ParsedInvoice`  
+2. `extractInventoryItems(parsedInvoice) → InventoryImportItem[]`  
+3. Converte ogni item in `PendingInvoiceLine` tramite `pendingInvoiceStore.savePendingLines(...)`, salvando:
+   - `description`, `quantity`, `unitPrice`, `invoiceNumber`, `invoiceDate`, `supplierName`  
+   - `detectedCategory`, `assignedCategory`  
+   - eventuali categorie aggiuntive (utenze, ecc.)  
+4. Registra la transazione contabile con `inventoryStore.addTransaction(parsedInvoice, selectedCategory)`  
+
+Nessuna scrittura diretta in `PlantInventory` o `inventoryMovements` qui.
+
+#### Flusso B – Pending → Inventario Piante (e cicli)
+
+Usa UNA unica funzione di servizio, riutilizzabile:
+
+`services/applyPendingLinesToInventory.ts` (già esistente, ma da rifinire se serve):
+
+- Legge: `const lines = await pendingInvoiceStore.getUnprocessedLines();`  
+- Filtra: `const plantLines = lines.filter(l => l.assignedCategory === 'piante');`  
+- Per ogni riga di pianta:
+  1. Ricava la `variety` con `extractVarietyFromDescription(line.description)`.  
+  2. Ricava `species` come prima parola della varietà.  
+  3. Calcola `cycleKey` in base a `variety` e `invoiceDate` usando la regola agosto–aprile descritta sopra.  
+  4. Crea un `PlantRecord` con `storage.savePlantRecord({ variety, species, quantity: line.quantity, arrivalDate: line.invoiceDate, sourceDocument, notes, cycleKey, benchRef?: undefined })`.  
+  5. Registra il movimento di entrata: `inventoryMovements.recordEntry('pianta', variety, quantity, line.invoiceDate, sourceDocument, note)`.  
+  6. Marca la riga come processata: `pendingInvoiceStore.markAsProcessed(line.id)`.  
+
+- Ritorna un report `{ totalLines, plantLines }`.  
+
+Questa funzione deve essere chiamata SOLO da un bottone chiaro in Magazzino (es. “Applica righe fatture al magazzino piante”).  
+Non devono esistere altre funzioni sparse che creano piante da `PendingInvoiceLine`.
+
+#### Flusso C – Inventario / Ciclo → Serre/Bancali (step successivo ma già previsto)
+
+Per ora voglio solo che:
+
+- **non venga toccato** lo schema attuale di serre e bancali (è ok così),  
+- ma i `PlantRecord` siano pronti per essere assegnati ai bancali in una fase successiva:
+  - stessa varietà + stesso `cycleKey` = stesso ciclo da distribuire su più bancali.  
+
+Quindi non implementare ora la logica di “spacchettare” su bancali, ma **assicura che i dati miglino:**
+
+- `PlantRecord` ha `cycleKey` e un placeholder per il collegamento a bancali;  
+- serre/bancali restano come sono;  
+- nessuna funzione rompe questa struttura.
+
+### 4. Cosa verificare/pulire
+
+Per favore:
+
+1. Cerca in tutto il codice eventuali punti che:
+   - scrivono in `PlantInventory` partendo direttamente da fatture o pending lines,  
+   - registrano movimenti `inventoryMovements` per piante fuori da `applyPendingLinesToPlantInventory`.  
+   Sposta tutta questa logica dentro le funzioni servizio del Flusso B.
+
+2. Aggiorna i tipi in `@/types`:
+   - `PlantRecord` almeno:  
+     `id, variety, species, quantity, arrivalDate, sourceDocument?, notes?, cycleKey?, benchRef?`  
+   - `PendingInvoiceLine` resta la fonte unica per le righe fattura.  
+   - `InventoryMovement` resta invariato come standard per i movimenti.
+
+3. Aggiungi commenti brevi (in italiano) sopra:
+   - `applyPendingLinesToPlantInventory`  
+   - la funzione che calcola il `cycleKey`  
+
+per ricordare la logica “agosto–aprile = stesso ciclo”.
+
+4. A fine lavoro, fammi vedere:
+   - elenco file modificati  
+   - versione finale di `applyPendingLinesToPlantInventory`  
+   - punto in `MagazzinoScreen` (o simile) dove viene chiamata  
+   - conferma che:
+     - non ci sono più scritture dirette in `PlantInventory` dalle fatture,  
+     - serre/bancali non sono stati modificati nella struttura,  
+     - `PlantRecord` contiene `cycleKey` pronto per collegare i lotti alle serre nel passo successivo.
+
+L’obiettivo è avere una base pulita, modulare, che collega in modo chiaro:
+**fattura → pending → inventario piante con ciclo → (in futuro) serre/bancali**,  
+senza duplicazioni di logica e senza confusione tra i vari moduli.

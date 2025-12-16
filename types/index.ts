@@ -34,6 +34,11 @@ export interface PlantRecord {
   arrivalDate: string;
   sourceDocument?: string;
   notes: string;
+  // Ciclo colturale: identifica il ciclo di coltivazione (es. "Leucospermum_2025-26")
+  // Regola: agosto-dicembre = anno/anno+1, gennaio-aprile = anno-1/anno
+  cycleKey?: string;
+  // Riferimento opzionale al bancale per distribuzione futura
+  benchRef?: string;
 }
 
 export interface PlantInventory {
