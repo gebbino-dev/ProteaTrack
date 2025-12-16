@@ -108,19 +108,27 @@ export async function applyPendingLinesToPlantInventory(): Promise<{
 /**
  * Processa una singola riga fattura di pianta o seme.
  * Funzione interna usata da applyPendingLinesToPlantInventory.
+ * 
+ * Se la riga ha forcedVariety o forcedSpecies (da regola utente),
+ * usa quelli invece di estrarre dalla descrizione.
  */
 async function processPlantLine(line: PendingInvoiceLine, itemType: 'pianta' | 'seme'): Promise<void> {
-  const rawVariety = extractVarietyFromDescription(line.description);
+  const extractedVariety = extractVarietyFromDescription(line.description);
+  
+  const rawVariety = line.forcedVariety || extractedVariety;
   const variety = itemType === 'seme' ? `[Semi] ${rawVariety}` : rawVariety;
-  const species = rawVariety.split(' ')[0] || rawVariety;
+  const species = line.forcedSpecies || rawVariety.split(' ')[0] || rawVariety;
   const sourceDoc = `FT ${line.invoiceNumber} del ${line.invoiceDate}`;
   const cycleKey = calculateCycleKey(rawVariety, line.invoiceDate);
 
   console.log(`[DEBUG] Saving plant record:`, {
     variety,
+    species,
     quantity: line.quantity,
     arrivalDate: line.invoiceDate,
     cycleKey,
+    usedForcedVariety: !!line.forcedVariety,
+    usedForcedSpecies: !!line.forcedSpecies,
   });
 
   const savedRecord = await storage.savePlantRecord({
