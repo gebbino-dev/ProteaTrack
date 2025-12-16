@@ -7,16 +7,17 @@ import { inventoryStore, MaterialRecord } from '@/utils/inventoryStore';
 /**
  * Calcola il cycleKey (ciclo colturale) per una pianta.
  * 
- * Regola stagionale:
- * - Le piante arrivano in un intervallo da agosto a marzo/aprile dell'anno successivo
+ * Regola stagionale (solo arrivi agosto-aprile):
+ * - Le piante di "inizio ciclo" arrivano da agosto a marzo/aprile dell'anno successivo
  * - Arrivi da agosto (08) a dicembre (12) → ciclo "anno/anno+1"
  * - Arrivi da gennaio (01) a aprile (04) → ciclo "anno-1/anno"
- * - Arrivi da maggio (05) a luglio (07) → ciclo "anno/anno+1" (stesso anno base)
+ * - Arrivi da maggio (05) a luglio (07) → FUORI CICLO, ritorna null
  * 
  * Esempio: varietà "Leucospermum" arriva il 15/10/2025 → cycleKey = "Leucospermum_2025-26"
  * Esempio: varietà "Protea" arriva il 20/02/2026 → cycleKey = "Protea_2025-26"
+ * Esempio: varietà "Banksia" arriva il 15/06/2025 → cycleKey = null (fuori ciclo)
  */
-export function calculateCycleKey(variety: string, arrivalDate: string): string {
+export function calculateCycleKey(variety: string, arrivalDate: string): string | null {
   const date = new Date(arrivalDate);
   const month = date.getMonth() + 1; // getMonth() è 0-indexed
   const year = date.getFullYear();
@@ -30,8 +31,9 @@ export function calculateCycleKey(variety: string, arrivalDate: string): string 
     // Gennaio-Aprile: ciclo anno-1/anno
     cycleStartYear = year - 1;
   } else {
-    // Maggio-Luglio: segue l'anno base (stesso comportamento di agosto-dicembre)
-    cycleStartYear = year;
+    // Maggio-Luglio: fuori dal ciclo colturale standard
+    // Ritorna null per indicare che non appartiene a un ciclo definito
+    return null;
   }
   
   const cycleEndYear = cycleStartYear + 1;
@@ -130,7 +132,7 @@ async function processPlantLine(line: PendingInvoiceLine, itemType: 'pianta' | '
     notes: itemType === 'seme' 
       ? `SEMI. Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`
       : `Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`,
-    cycleKey,
+    cycleKey: cycleKey ?? undefined,
   });
 
   console.log(`[DEBUG] Plant record saved successfully:`, savedRecord);
