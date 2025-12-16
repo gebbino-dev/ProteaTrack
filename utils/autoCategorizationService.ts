@@ -1,4 +1,5 @@
 import { pendingInvoiceStore, PendingInvoiceLine, ItemCategory } from './pendingInvoiceStore';
+import { userCategorizationRulesStore, applyUserRules, itemCategoryToCategoriaRiga, UserCategorizationRule } from './userCategorizationRules';
 
 export type CategoriaRiga = 
   | 'utenze'
@@ -34,6 +35,12 @@ export type SottoCategoriaUtenza =
 export interface CategorizzazioneResult {
   categoria: CategoriaRiga;
   sottoCategoriaUtenza: SottoCategoriaUtenza;
+}
+
+export interface CategorizzazioneExtendedResult extends CategorizzazioneResult {
+  forcedVariety?: string;
+  forcedSpecies?: string;
+  matchedByUserRule?: boolean;
 }
 
 export interface ClassificazioneStats {
@@ -223,8 +230,41 @@ export function classificaRiga(descrizione: string): CategorizzazioneResult {
   return { categoria: 'materiale_generico', sottoCategoriaUtenza: '' };
 }
 
+/**
+ * Classifica una riga con PRIORITÀ alle regole utente.
+ * Se una regola utente matcha, usa quella categoria/varietà.
+ * Altrimenti, usa la classificazione automatica.
+ */
+export function classificaRigaConRegoleUtente(
+  descrizione: string,
+  userRules: UserCategorizationRule[]
+): CategorizzazioneExtendedResult {
+  const userMatch = applyUserRules(descrizione, userRules);
+  
+  if (userMatch.itemCategory) {
+    const categoria = userMatch.categoriaRiga || itemCategoryToCategoriaRiga(userMatch.itemCategory);
+    console.log(`[AutoCat] Regola utente applicata per: "${descrizione.substring(0, 50)}..." -> ${categoria}`);
+    return {
+      categoria,
+      sottoCategoriaUtenza: userMatch.sottoCategoriaUtenza || '',
+      forcedVariety: userMatch.forcedVariety,
+      forcedSpecies: userMatch.forcedSpecies,
+      matchedByUserRule: true,
+    };
+  }
+  
+  const autoResult = classificaRiga(descrizione);
+  return {
+    ...autoResult,
+    matchedByUserRule: false,
+  };
+}
+
 export async function classificaTutteLeRighe(): Promise<ClassificazioneStats> {
   const lines = await pendingInvoiceStore.getPendingLines();
+  const userRules = await userCategorizationRulesStore.getRules();
+  
+  console.log(`[AutoCat] Classificazione con ${userRules.length} regole utente`);
   
   const stats: ClassificazioneStats = {
     totaleRighe: lines.length,
@@ -250,17 +290,17 @@ export async function classificaTutteLeRighe(): Promise<ClassificazioneStats> {
   };
   
   for (const line of lines) {
-    const result = classificaRiga(line.description);
+    const result = classificaRigaConRegoleUtente(line.description, userRules);
     
-    // Mappa alla categoria corretta per pendingInvoiceStore
     const itemCategory = CATEGORIA_TO_ITEM_CATEGORY[result.categoria];
     
-    // Aggiorna TUTTI i campi categoria per compatibilita con entrambe le schermate
     await pendingInvoiceStore.updateLine(line.id, {
       assignedCategory: itemCategory,
       detectedCategory: itemCategory,
       categoria: result.categoria,
       sottoCategoriaUtenza: result.sottoCategoriaUtenza,
+      forcedVariety: result.forcedVariety,
+      forcedSpecies: result.forcedSpecies,
     });
     
     stats.righeClassificate++;

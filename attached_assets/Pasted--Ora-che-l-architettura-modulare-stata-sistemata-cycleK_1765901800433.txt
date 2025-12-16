@@ -1,0 +1,133 @@
+
+Ora che l’architettura modulare è stata sistemata (cycleKey, applyPendingLinesToInventory, ecc.), ho bisogno di migliorare **la qualità della classificazione** delle righe fattura con un sistema di REGOLE configurabili dall’utente.
+
+### 1. Nuovo modulo: regole di categorizzazione utente
+
+Crea un nuovo file `utils/userCategorizationRules.ts` (o nome simile) con:
+
+- tipo:
+
+```ts
+export interface UserCategorizationRule {
+  id: string;
+  keyword: string;              // per ora una keyword semplice, case-insensitive
+  itemCategory: ItemCategory;   // 'piante' | 'vasi' | 'terriccio' | ... (riusa il tipo esistente)
+  categoriaRiga?: CategoriaRiga;
+  sottoCategoriaUtenza?: SottoCategoriaUtenza;
+  forcedVariety?: string;       // opzionale, solo per piante
+  forcedSpecies?: string;       // opzionale, solo per piante
+}
+```
+
+- uno store semplice in AsyncStorage, es: chiave `serra_user_categorization_rules`, con funzioni:
+
+```ts
+getRules(): Promise<UserCategorizationRule[]>
+saveRule(ruleInput: Omit<UserCategorizationRule, 'id'>): Promise<UserCategorizationRule>
+updateRule(id, updates)
+deleteRule(id)
+clearRules()
+```
+
+- una funzione centrale:
+
+```ts
+export function applyUserRules(
+  description: string,
+  rules: UserCategorizationRule[]
+): {
+  itemCategory?: ItemCategory;
+  categoriaRiga?: CategoriaRiga;
+  sottoCategoriaUtenza?: SottoCategoriaUtenza;
+  forcedVariety?: string;
+  forcedSpecies?: string;
+} {
+  const desc = description.toLowerCase();
+  for (const rule of rules) {
+    if (desc.includes(rule.keyword.toLowerCase())) {
+      return {
+        itemCategory: rule.itemCategory,
+        categoriaRiga: rule.categoriaRiga,
+        sottoCategoriaUtenza: rule.sottoCategoriaUtenza,
+        forcedVariety: rule.forcedVariety,
+        forcedSpecies: rule.forcedSpecies,
+      };
+    }
+  }
+  return {};
+}
+```
+
+### 2. Integrare le regole nel flusso di import
+
+Nel file dove oggi fai l’auto‑classificazione (probabilmente `utils/autoCategorizationService.ts`):
+
+- importa le regole:
+
+```ts
+import { userCategorizationRulesStore, applyUserRules } from '@/utils/userCategorizationRules';
+```
+
+- nella funzione `classificaRiga(description)`:
+
+1. Prima di usare qualsiasi logica “hardcoded” esistente, carica le regole:
+
+```ts
+const rules = await userCategorizationRulesStore.getRules();
+const byUser = applyUserRules(description, rules);
+
+if (byUser.itemCategory) {
+  // Se l’utente ha definito una categoria esplicita, usala e sovrascrivi le inferenze automatiche
+  return {
+    categoria: byUser.categoriaRiga || categoriaInferitaDefault,
+    sottoCategoriaUtenza: byUser.sottoCategoriaUtenza || '',
+    itemType: byUser.itemCategory,
+    forcedVariety: byUser.forcedVariety,
+    forcedSpecies: byUser.forcedSpecies,
+  };
+}
+```
+
+2. Solo se nessuna regola utente matcha, usa la logica automatica che c’è già (regex, parole chiave predefinite, ecc.).
+
+Nel punto in cui crei gli `InventoryImportItem` / `PendingInvoiceLine`:
+
+- se `classificaRiga` restituisce `forcedVariety` / `forcedSpecies` e `itemType === 'piante'`, passa questi valori fino a `extractInventoryItems` / `applyPendingLinesToPlantInventory`, in modo che:
+
+```ts
+const variety = forcedVariety || extractVarietyFromDescription(description);
+const species = forcedSpecies || calcoloAttualeSpecies;
+```
+
+### 3. UI minima per gestire le regole (anche molto semplice)
+
+Non serve una grande interfaccia, ma almeno:
+
+- una schermata “Regole di classificazione” (anche nascosta nel pannello Debug), dove posso:
+  - aggiungere una regola (keyword + categoria + opzionale varietà/specie),
+  - vedere la lista delle regole,
+  - modificare/eliminare una regola.
+
+Se vuoi risparmiare tempo, per ora puoi:
+
+- non fare una schermata nuova, ma aggiungere un blocco nella schermata Debug (dove ci sono già “Stats / Reset / Solo importati”) con:
+  - un paio di `TextInput` per keyword e categoria,
+  - un bottone “Salva regola” che chiama `userCategorizationRulesStore.saveRule`.
+
+L’importante è che **esista il meccanismo**; la UI potrà essere raffinata dopo.
+
+### 4. Vincoli importanti
+
+- Non toccare l’architettura appena fatta (cycleKey, applyPendingLinesToPlantInventory, serre/bancali).  
+- Aggiungi SOLO questo layer di regole utente sopra la logica di auto riconoscimento esistente.  
+- Le regole utente devono avere PRIORITÀ: se c’è un match, si usa quella categoria/varietà, e non quella dedotta automaticamente.
+
+A fine lavoro, fammi vedere:
+
+- il file `userCategorizationRules.ts` completo,
+- le modifiche a `autoCategorizationService.ts` (o file equivalente),
+- un esempio di come viene usata `forcedVariety/forcedSpecies` nel flusso piante.
+
+***
+
+Con questo sistema, posso insegnare all’app le mie parole chiave una volta sola, e tutte le fatture future verranno suddivise in modo coerente senza doverci rimettere mano ogni volta.

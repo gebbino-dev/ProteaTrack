@@ -44,6 +44,8 @@ export interface PendingInvoiceLine {
   isProcessed: boolean;
   processedAt?: string;
   createdAt: string;
+  forcedVariety?: string;
+  forcedSpecies?: string;
 }
 
 export const CATEGORY_CONFIG: Record<ItemCategory, { label: string; icon: string; color: string }> = {
