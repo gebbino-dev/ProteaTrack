@@ -49,8 +49,8 @@ Each `PlantRecord` serves as the complete identity for a plant lot with:
 ### Vivaio Concept
 -   Plants arrive from invoices → go to PlantInventory ("Vivaio")
 -   Plants in PlantInventory are considered "in Vivaio" until manually assigned to benches
--   `getStats().totalPlants` = `totalPlantsInventory` (Vivaio) + `totalPlantsBenches` (sui bancali)
--   Future: `benchRef` field will track movement from Vivaio to specific benches
+-   `getStats().totalPlants` = somma delle quantità in PlantInventory (solo Vivaio, no bancali)
+-   Future: `benchRef` field will track movement from Vivaio to specific benches; a separate stat for "piante su bancali" will be added
 
 ### Unified Calendar System (EventAggregator)
 Displays aggregated events from all modules: Activities, Treatments, Transactions, and Plant Arrivals, each with distinct colors and icons.
