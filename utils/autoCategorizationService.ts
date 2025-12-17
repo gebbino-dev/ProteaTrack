@@ -1,5 +1,6 @@
 import { pendingInvoiceStore, PendingInvoiceLine, ItemCategory } from './pendingInvoiceStore';
 import { userCategorizationRulesStore, applyUserRules, itemCategoryToCategoriaRiga, UserCategorizationRule } from './userCategorizationRules';
+import { proteaVarietyRulesStore, matchProteaVariety, ProteaVarietyRule, ProteaGenus } from './proteaVarietyRules';
 
 export type CategoriaRiga = 
   | 'utenze'
@@ -41,6 +42,10 @@ export interface CategorizzazioneExtendedResult extends CategorizzazioneResult {
   forcedVariety?: string;
   forcedSpecies?: string;
   matchedByUserRule?: boolean;
+  matchedGenus?: ProteaGenus;
+  matchedVariety?: string;
+  matchedTradeName?: string;
+  matchedRuleId?: string;
 }
 
 export interface ClassificazioneStats {
@@ -251,40 +256,77 @@ export function classificaRiga(descrizione: string): CategorizzazioneResult {
 }
 
 /**
- * Classifica una riga con PRIORITÀ alle regole utente.
- * Se una regola utente matcha, usa quella categoria/varietà.
- * Altrimenti, usa la classificazione automatica.
+ * Classifica una riga con PRIORITÀ alle regole utente e dizionario proteacee.
+ * 
+ * Ordine di priorità:
+ * 1. Regole utente (UserCategorizationRule) - per categoria e varietà forzate
+ * 2. Dizionario proteacee (ProteaVarietyRule) - per riconoscimento preciso varietà
+ *    (applicato anche se una regola utente ha settato la categoria ma NON forcedVariety)
+ * 3. Classificazione automatica (heuristics)
+ * 
+ * Il dizionario proteacee viene sempre consultato per righe piante/semi,
+ * così che forcedVariety da regola utente > matchedVariety da dizionario > estrazione automatica.
  */
 export function classificaRigaConRegoleUtente(
   descrizione: string,
-  userRules: UserCategorizationRule[]
+  userRules: UserCategorizationRule[],
+  proteaRules: ProteaVarietyRule[] = []
 ): CategorizzazioneExtendedResult {
   const userMatch = applyUserRules(descrizione, userRules);
   
+  let categoria: CategoriaRiga;
+  let sottoCategoriaUtenza: SottoCategoriaUtenza = '';
+  let matchedByUserRule = false;
+  let forcedVariety: string | undefined;
+  let forcedSpecies: string | undefined;
+  
   if (userMatch.itemCategory) {
-    const categoria = userMatch.categoriaRiga || itemCategoryToCategoriaRiga(userMatch.itemCategory);
+    categoria = userMatch.categoriaRiga || itemCategoryToCategoriaRiga(userMatch.itemCategory);
+    sottoCategoriaUtenza = userMatch.sottoCategoriaUtenza || '';
+    matchedByUserRule = true;
+    forcedVariety = userMatch.forcedVariety;
+    forcedSpecies = userMatch.forcedSpecies;
     console.log(`[AutoCat] Regola utente applicata per: "${descrizione.substring(0, 50)}..." -> ${categoria}`);
-    return {
-      categoria,
-      sottoCategoriaUtenza: userMatch.sottoCategoriaUtenza || '',
-      forcedVariety: userMatch.forcedVariety,
-      forcedSpecies: userMatch.forcedSpecies,
-      matchedByUserRule: true,
-    };
+  } else {
+    const autoResult = classificaRiga(descrizione);
+    categoria = autoResult.categoria;
+    sottoCategoriaUtenza = autoResult.sottoCategoriaUtenza;
   }
   
-  const autoResult = classificaRiga(descrizione);
+  if (categoria === 'piante' || categoria === 'semi') {
+    const proteaMatch = matchProteaVariety(descrizione, proteaRules);
+    
+    if (proteaMatch.genus && proteaMatch.scientificName) {
+      console.log(`[AutoCat] Dizionario proteacee match: "${descrizione.substring(0, 50)}..." -> ${proteaMatch.genus} ${proteaMatch.scientificName}`);
+      return {
+        categoria,
+        sottoCategoriaUtenza,
+        matchedByUserRule,
+        forcedVariety,
+        forcedSpecies,
+        matchedGenus: proteaMatch.genus,
+        matchedVariety: proteaMatch.scientificName,
+        matchedTradeName: proteaMatch.tradeName,
+        matchedRuleId: proteaMatch.matchedRuleId,
+      };
+    }
+  }
+  
   return {
-    ...autoResult,
-    matchedByUserRule: false,
+    categoria,
+    sottoCategoriaUtenza,
+    matchedByUserRule,
+    forcedVariety,
+    forcedSpecies,
   };
 }
 
 export async function classificaTutteLeRighe(): Promise<ClassificazioneStats> {
   const lines = await pendingInvoiceStore.getPendingLines();
   const userRules = await userCategorizationRulesStore.getRules();
+  const proteaRules = await proteaVarietyRulesStore.getRules();
   
-  console.log(`[AutoCat] Classificazione con ${userRules.length} regole utente`);
+  console.log(`[AutoCat] Classificazione con ${userRules.length} regole utente e ${proteaRules.length} regole proteacee`);
   
   const stats: ClassificazioneStats = {
     totaleRighe: lines.length,
@@ -310,7 +352,7 @@ export async function classificaTutteLeRighe(): Promise<ClassificazioneStats> {
   };
   
   for (const line of lines) {
-    const result = classificaRigaConRegoleUtente(line.description, userRules);
+    const result = classificaRigaConRegoleUtente(line.description, userRules, proteaRules);
     
     const itemCategory = CATEGORIA_TO_ITEM_CATEGORY[result.categoria];
     
@@ -321,6 +363,10 @@ export async function classificaTutteLeRighe(): Promise<ClassificazioneStats> {
       sottoCategoriaUtenza: result.sottoCategoriaUtenza,
       forcedVariety: result.forcedVariety,
       forcedSpecies: result.forcedSpecies,
+      matchedGenus: result.matchedGenus,
+      matchedVariety: result.matchedVariety,
+      matchedTradeName: result.matchedTradeName,
+      matchedRuleId: result.matchedRuleId,
     });
     
     stats.righeClassificate++;

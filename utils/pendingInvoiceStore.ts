@@ -46,6 +46,10 @@ export interface PendingInvoiceLine {
   createdAt: string;
   forcedVariety?: string;
   forcedSpecies?: string;
+  matchedGenus?: string;
+  matchedVariety?: string;
+  matchedTradeName?: string;
+  matchedRuleId?: string;
 }
 
 export const CATEGORY_CONFIG: Record<ItemCategory, { label: string; icon: string; color: string }> = {

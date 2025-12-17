@@ -38,6 +38,14 @@ The app manages 3 greenhouses, each 2000 m², divided into 3 arcs (4 sectors per
 ### Data Types (from `types/index.ts`)
 Centralized types for: `Activity`, `Bench`, `Greenhouse`, `GreenhouseConfig`, `PlantRecord`, `Transaction`, `TransactionCategory`, `Treatment`, `PhytosanitaryProduct`, `GreenhouseStats`.
 
+### PlantRecord "Identity Card"
+Each `PlantRecord` serves as the complete identity for a plant lot with:
+-   `id`, `variety`, `species`, `quantity`, `arrivalDate`
+-   `sourceDocument` (invoice reference), `notes`
+-   `cycleKey` (cultivation cycle identifier, e.g., "Leucospermum_2025-26")
+-   `benchRef` (optional link to bench for future distribution)
+-   `matchedRuleId` (optional: ID of ProteaVarietyRule that identified this variety)
+
 ### Unified Calendar System (EventAggregator)
 Displays aggregated events from all modules: Activities, Treatments, Transactions, and Plant Arrivals, each with distinct colors and icons.
 
@@ -50,7 +58,18 @@ Displays aggregated events from all modules: Activities, Treatments, Transaction
     -   When a keyword matches (case-insensitive), the rule's category and forced variety/species are applied.
     -   Rules are stored in AsyncStorage (`serra_user_categorization_rules`).
     -   UI to manage rules is in ProfileScreen under "Regole di Categorizzazione".
-    -   Flow: `classificaRigaConRegoleUtente()` checks user rules first -> falls back to automatic classification.
+-   **Protea Variety Dictionary** (`utils/proteaVarietyRules.ts`):
+    -   Configurable dictionary for precise recognition of Proteaceae varieties from invoice descriptions.
+    -   Each rule contains: `genus` (Protea, Leucospermum, etc.), `scientificName`, optional `tradeName`, `keywords[]`.
+    -   Keywords are matched case-insensitively against invoice line descriptions.
+    -   Rules are stored in AsyncStorage (`serra_protea_variety_rules`).
+    -   UI to manage rules is in ProfileScreen under "Dizionario Varietà Proteacee".
+    -   When a protea variety matches, `matchedGenus`, `matchedVariety`, `matchedTradeName`, `matchedRuleId` are stored on the `PendingInvoiceLine`.
+-   **Classification Priority Chain**:
+    1.  User Categorization Rules (for category + optional forcedVariety/forcedSpecies)
+    2.  Protea Variety Dictionary (for matchedVariety/matchedGenus - runs for piante/semi even if user rule matched)
+    3.  Automatic keyword-based classification (heuristics)
+    -   Flow: `classificaRigaConRegoleUtente()` applies user rules, then protea dictionary for piante/semi, then automatic classification.
 
 ### Inventory Movements and Stock
 -   Tracks inventory movements (entry/exit) for plants, seeds, and materials.

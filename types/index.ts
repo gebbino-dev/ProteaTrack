@@ -39,6 +39,8 @@ export interface PlantRecord {
   cycleKey?: string;
   // Riferimento opzionale al bancale per distribuzione futura
   benchRef?: string;
+  // ID della regola ProteaVarietyRule che ha generato questo record (opzionale)
+  matchedRuleId?: string;
 }
 
 export interface PlantInventory {

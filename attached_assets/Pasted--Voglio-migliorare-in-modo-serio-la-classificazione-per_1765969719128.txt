@@ -1,0 +1,233 @@
+
+Voglio migliorare in modo serio la **classificazione per genere e varietà** delle proteacee (Protea, Leucospermum, Telopea, Serruria, Banksia) partendo dalle descrizioni delle fatture.  
+In più, ogni lotto di piante deve portarsi dietro tutte le informazioni chiave (come una “carta d’identità”) lungo tutto il flusso: fattura → pending → inventario → ciclo → bancali.
+
+Ti chiedo di implementare un sistema basato su un **dizionario configurabile da me** e di collegarlo ai cicli produttivi e ai bancali.
+
+***
+
+## 1. Dizionario varietà proteacee configurabile
+
+Crea un nuovo modulo `utils/proteaVarietyRules.ts` con:
+
+### 1.1. Tipi e storage
+
+```ts
+// Generi che mi interessano
+export type ProteaGenus = 'Protea' | 'Leucospermum' | 'Telopea' | 'Serruria' | 'Banksia';
+
+// Regola di riconoscimento varietà da descrizione fattura
+export interface ProteaVarietyRule {
+  id: string;
+  genus: ProteaGenus;       // es. 'Leucospermum'
+  scientificName: string;   // es. 'Leucospermum cordifolium'
+  tradeName?: string;       // es. 'High Gold' (opzionale)
+  keywords: string[];       // parole/abbr. che compaiono in fattura: ['LEUC CORDIF', 'CORDIFOLIUM', 'CORDIF']
+}
+
+// Store in AsyncStorage
+export const proteaVarietyRulesStore = {
+  getRules(): Promise<ProteaVarietyRule[]>;
+  saveRule(input: Omit<ProteaVarietyRule, 'id'>): Promise<ProteaVarietyRule>;
+  updateRule(id: string, updates: Partial<ProteaVarietyRule>): Promise<ProteaVarietyRule | null>;
+  deleteRule(id: string): Promise<void>;
+  clearRules(): Promise<number>; // ritorna quante regole ha cancellato
+};
+```
+
+Implementa lo store con una chiave tipo `serra_protea_variety_rules` usando lo stesso pattern degli altri store (pendingInvoiceStore, ecc.).
+
+### 1.2. Funzione di matching centrale
+
+Nello stesso file:
+
+```ts
+export interface ProteaMatchResult {
+  genus?: ProteaGenus;
+  scientificName?: string;
+  tradeName?: string;
+  matchedRuleId?: string;
+}
+
+export function matchProteaVariety(
+  description: string,
+  rules: ProteaVarietyRule[]
+): ProteaMatchResult {
+  const desc = description.toLowerCase();
+
+  // Strategia semplice: prima regola la cui keyword è contenuta nella descrizione
+  for (const rule of rules) {
+    for (const kw of rule.keywords) {
+      if (!kw) continue;
+      if (desc.includes(kw.toLowerCase())) {
+        return {
+          genus: rule.genus,
+          scientificName: rule.scientificName,
+          tradeName: rule.tradeName,
+          matchedRuleId: rule.id,
+        };
+      }
+    }
+  }
+
+  return {};
+}
+```
+
+***
+
+## 2. Integrare il dizionario nel flusso di import e pending
+
+### 2.1. Estendere PendingInvoiceLine e/o InventoryImportItem
+
+Nei tipi esistenti (`PendingInvoiceLine` e, se serve, `InventoryImportItem`) aggiungi campi opzionali per il match:
+
+```ts
+// PendingInvoiceLine
+matchedGenus?: ProteaGenus;
+matchedVariety?: string;       // scientificName
+matchedTradeName?: string;
+matchedRuleId?: string;
+```
+
+Questi campi servono solo come “memoria” di come è stata riconosciuta la riga.
+
+### 2.2. Uso nel servizio di auto‑classificazione
+
+Nel file dove oggi esiste `classificaRiga(description)` (es. `utils/autoCategorizationService.ts`):
+
+1. Importa il nuovo modulo:
+
+```ts
+import { proteaVarietyRulesStore, matchProteaVariety } from '@/utils/proteaVarietyRules';
+```
+
+2. All’interno di `classificaRiga(description)`:
+
+- Dopo aver determinato in modo grezzo che una riga è candidata come `piante` **MA PRIMA** della logica generica di `extractVarietyFromDescription`, fai:
+
+```ts
+// Solo se la riga è sospetta "piante" (in base alle regole attuali)
+const rules = await proteaVarietyRulesStore.getRules();
+const proteaMatch = matchProteaVariety(description, rules);
+
+if (proteaMatch.genus && proteaMatch.scientificName) {
+  // Restituisci anche info sul match
+  return {
+    categoria: 'piante',                // o struttura che usi ora
+    sottoCategoriaUtenza: '',
+    itemType: 'piante',
+    matchedGenus: proteaMatch.genus,
+    matchedVariety: proteaMatch.scientificName,
+    matchedTradeName: proteaMatch.tradeName,
+    matchedRuleId: proteaMatch.matchedRuleId,
+  };
+}
+```
+
+- Solo se **non** c’è match nel dizionario, usa la logica attuale (parole chiave, `extractVarietyFromDescription`, ecc.).
+
+3. Quando costruisci `PendingInvoiceLine` (in `invoiceImportService`):
+
+- se `classificaRiga` ha restituito `matchedGenus` / `matchedVariety`, scrivili nei nuovi campi del `PendingInvoiceLine`.
+
+***
+
+## 3. Ingresso in inventario piante con “carta d’identità” completa
+
+La funzione `applyPendingLinesToPlantInventory` deve usare in PRIORITÀ i dati dal dizionario.
+
+Modifica così:
+
+```ts
+// Dentro applyPendingLinesToPlantInventory, nel ciclo per ogni plantLine:
+const baseVariety = extractVarietyFromDescription(line.description);
+
+// Se ho dati dal dizionario, li uso
+const finalVariety = line.matchedVariety || baseVariety;
+const genusFromMatch = line.matchedGenus;
+const species =
+  line.matchedVariety?.split(' ')[0] ||
+  genusFromMatch ||
+  baseVariety.split(' ')[0] ||
+  baseVariety;
+
+// Calcolo cycleKey usando la funzione già esistente (calculateCycleKey) basata su variety/species + invoiceDate
+const cycleKey = calculateCycleKey(finalVariety, line.invoiceDate);
+
+await storage.savePlantRecord({
+  variety: finalVariety,
+  species,
+  quantity: line.quantity,
+  arrivalDate: line.invoiceDate,
+  sourceDocument: sourceDoc,
+  notes: `Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`,
+  cycleKey,
+  benchRef: undefined,        // verrà impostato quando le piante saranno messe sui bancali
+});
+```
+
+In questo modo, ogni `PlantRecord` ha già:
+
+- varietà precisa (se trovata nel dizionario),
+- specie/genere corretti,
+- `arrivalDate`,
+- `cycleKey` calcolato (per distinguere i cicli produttivi),
+- `sourceDocument` e `notes`.
+
+***
+
+## 4. Collegamento futuro ai bancali (“carta d’identità” che segue il lotto)
+
+L’obiettivo è che, quando distribuisco le piante nei bancali, ogni lotto si porti dietro tutta la sua “carta d’identità”.  
+Per ora ti chiedo solo di **preparare i dati**, senza cambiare la logica esistente dei bancali:
+
+1. Assicurati che `PlantRecord` contenga questi campi (alcuni già ci sono):
+
+```ts
+id: string;
+variety: string;
+species: string;
+quantity: number;
+arrivalDate: string;
+sourceDocument?: string;
+notes?: string;
+cycleKey?: string;
+benchRef?: string;       // opzionale: id del bancale o chiave di collegamento
+matchedRuleId?: string;  // opzionale: da quale regola proteaVarietyRules è nato
+```
+
+2. Quando in futuro sposteremo le piante sui bancali:
+
+- l’entità che rappresenta il “lotto su bancale” dovrà referenziare il `PlantRecord.id` (o copiare alcuni campi), in modo che tutte le info (genere, varietà, ciclo, origine fattura, date) rimangano collegate.
+
+Per ora non toccare la logica di bancali: mi basta che `PlantRecord` sia pronto a fungere da “carta d’identità” del lotto.
+
+***
+
+## 5. UI minima per gestire il dizionario (anche semplice)
+
+Se possibile, aggiungi una vista semplice (anche nel pannello Debug):
+
+- elenco delle `ProteaVarietyRule` esistenti (genus, scientificName, keywords),
+- form per aggiungere una nuova regola:
+  - select genus (Protea, Leucospermum, Telopea, Serruria, Banksia),
+  - input scientificName,
+  - input keywords (anche solo come stringa separata da virgole, che poi splitti in array).
+
+In alternativa, per risparmiare tempo, basta esporre nel codice una funzione helper (da usare in console dev) per aggiungere rapidamente regole, es.:
+
+```ts
+async function quickAddRule(genus, scientificName, keywordsCsv) {
+  const keywords = keywordsCsv.split(',').map(k => k.trim()).filter(Boolean);
+  await proteaVarietyRulesStore.saveRule({ genus, scientificName, keywords });
+}
+```
+
+***
+
+## 6. Vincoli importanti
+
+- Non rompere l’architettura già sistemata (applyPendingLinesToPlantInventory, cycleKey, serre/bancali).  
+- Le nuove funzioni (`proteaVarietyRulesStore`, `matchProteaVariety`) devono solo migliorare la qualità del riconoscimento.  
+- Le regole utente (dizionario) hanno PRIORITÀ rispetto a qualsiasi heuristic o `extractVarietyFromDescription`.

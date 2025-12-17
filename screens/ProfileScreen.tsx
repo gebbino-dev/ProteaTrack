@@ -18,6 +18,7 @@ import type { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 import { userCategorizationRulesStore, UserCategorizationRule } from "@/utils/userCategorizationRules";
 import { ItemCategory, CATEGORY_CONFIG } from "@/utils/pendingInvoiceStore";
 import { AUTO_KEYWORDS, AUTO_KEYWORDS_UTENZE, CATEGORIA_CONFIG, SOTTOCATEGORIA_UTENZA_CONFIG, CategoriaRiga, SottoCategoriaUtenza } from "@/utils/autoCategorizationService";
+import { proteaVarietyRulesStore, ProteaVarietyRule, PROTEA_GENUS_LIST, PROTEA_GENUS_CONFIG, ProteaGenus } from "@/utils/proteaVarietyRules";
 
 type ProfileScreenProps = {
   navigation: NativeStackNavigationProp<ProfileStackParamList, "Profile">;
@@ -52,15 +53,23 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [newRuleVariety, setNewRuleVariety] = useState('');
   const [newRuleSpecies, setNewRuleSpecies] = useState('');
   const [showRulesSection, setShowRulesSection] = useState(false);
+  
+  const [proteaRules, setProteaRules] = useState<ProteaVarietyRule[]>([]);
+  const [showProteaSection, setShowProteaSection] = useState(false);
+  const [newProteaGenus, setNewProteaGenus] = useState<ProteaGenus>('Leucospermum');
+  const [newProteaScientificName, setNewProteaScientificName] = useState('');
+  const [newProteaTradeName, setNewProteaTradeName] = useState('');
+  const [newProteaKeywords, setNewProteaKeywords] = useState('');
 
   useFocusEffect(
     useCallback(() => {
       const loadData = async () => {
-        const [savedSettings, statsData, debugData, rules] = await Promise.all([
+        const [savedSettings, statsData, debugData, rules, pRules] = await Promise.all([
           storage.getSettings(),
           storage.getStats(),
           storageDebug.checkDataExists(),
           userCategorizationRulesStore.getRules(),
+          proteaVarietyRulesStore.getRules(),
         ]);
         setSettings(savedSettings);
         setStats({
@@ -70,6 +79,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         });
         setDebugInfo(debugData);
         setUserRules(rules);
+        setProteaRules(pRules);
       };
       loadData();
     }, [])
@@ -317,6 +327,57 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         [
           { text: 'Annulla', style: 'cancel' },
           { text: 'Elimina Tutte', style: 'destructive', onPress: doClear },
+        ]
+      );
+    }
+  };
+
+  const handleAddProteaRule = async () => {
+    if (!newProteaScientificName.trim()) {
+      Alert.alert('Errore', 'Inserisci il nome scientifico');
+      return;
+    }
+    if (!newProteaKeywords.trim()) {
+      Alert.alert('Errore', 'Inserisci almeno una keyword');
+      return;
+    }
+    
+    try {
+      const keywords = newProteaKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+      const newRule = await proteaVarietyRulesStore.saveRule({
+        genus: newProteaGenus,
+        scientificName: newProteaScientificName.trim(),
+        tradeName: newProteaTradeName.trim() || undefined,
+        keywords,
+      });
+      
+      setProteaRules([...proteaRules, newRule]);
+      setNewProteaScientificName('');
+      setNewProteaTradeName('');
+      setNewProteaKeywords('');
+      Alert.alert('Successo', `Varieta "${newRule.scientificName}" aggiunta`);
+    } catch (error) {
+      Alert.alert('Errore', `Impossibile salvare: ${error}`);
+    }
+  };
+
+  const handleDeleteProteaRule = async (ruleId: string, name: string) => {
+    const doDelete = async () => {
+      await proteaVarietyRulesStore.deleteRule(ruleId);
+      setProteaRules(proteaRules.filter(r => r.id !== ruleId));
+    };
+    
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Eliminare "${name}"?`)) {
+        await doDelete();
+      }
+    } else {
+      Alert.alert(
+        'Conferma',
+        `Eliminare "${name}"?`,
+        [
+          { text: 'Annulla', style: 'cancel' },
+          { text: 'Elimina', style: 'destructive', onPress: doDelete },
         ]
       );
     }
@@ -929,6 +990,174 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                   Elimina Tutte le Regole
                 </ThemedText>
               </Pressable>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      <Spacer height={Spacing.lg} />
+
+      <Pressable
+        style={[
+          styles.saveButton,
+          {
+            backgroundColor: showProteaSection ? '#4CAF50' : theme.backgroundDefault,
+            borderWidth: showProteaSection ? 0 : 1,
+            borderColor: '#4CAF50',
+          },
+        ]}
+        onPress={() => setShowProteaSection(!showProteaSection)}
+      >
+        <Feather name="book" size={20} color={showProteaSection ? '#FFFFFF' : '#4CAF50'} />
+        <ThemedText style={[styles.saveButtonText, { color: showProteaSection ? '#FFFFFF' : '#4CAF50' }]}>
+          Dizionario Varieta Proteacee ({proteaRules.length})
+        </ThemedText>
+        <Feather name={showProteaSection ? 'chevron-up' : 'chevron-down'} size={20} color={showProteaSection ? '#FFFFFF' : '#4CAF50'} />
+      </Pressable>
+
+      {showProteaSection ? (
+        <View style={{ marginTop: Spacing.lg }}>
+          <View style={[styles.debugCard, { backgroundColor: theme.backgroundDefault }]}>
+            <ThemedText style={{ fontWeight: '600', fontSize: 16, marginBottom: Spacing.md }}>
+              Aggiungi Varieta
+            </ThemedText>
+
+            <View style={styles.fieldContainer}>
+              <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+                Genere
+              </ThemedText>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs }}>
+                {PROTEA_GENUS_LIST.map(genus => (
+                  <Pressable
+                    key={genus}
+                    style={[
+                      styles.categoryChip,
+                      {
+                        backgroundColor: newProteaGenus === genus ? PROTEA_GENUS_CONFIG[genus].color : theme.backgroundSecondary,
+                      },
+                    ]}
+                    onPress={() => setNewProteaGenus(genus)}
+                  >
+                    <ThemedText style={{ 
+                      fontSize: 11, 
+                      color: newProteaGenus === genus ? '#FFFFFF' : theme.text,
+                    }}>
+                      {genus}
+                    </ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            <Spacer height={Spacing.md} />
+
+            <View style={styles.fieldContainer}>
+              <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+                Nome Scientifico (obbligatorio)
+              </ThemedText>
+              <TextInput
+                style={inputStyle}
+                value={newProteaScientificName}
+                onChangeText={setNewProteaScientificName}
+                placeholder="es. Leucospermum cordifolium"
+                placeholderTextColor={theme.textSecondary}
+              />
+            </View>
+
+            <Spacer height={Spacing.md} />
+
+            <View style={styles.fieldContainer}>
+              <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+                Nome Commerciale (opzionale)
+              </ThemedText>
+              <TextInput
+                style={inputStyle}
+                value={newProteaTradeName}
+                onChangeText={setNewProteaTradeName}
+                placeholder="es. High Gold"
+                placeholderTextColor={theme.textSecondary}
+              />
+            </View>
+
+            <Spacer height={Spacing.md} />
+
+            <View style={styles.fieldContainer}>
+              <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
+                Keywords (separate da virgola)
+              </ThemedText>
+              <TextInput
+                style={inputStyle}
+                value={newProteaKeywords}
+                onChangeText={setNewProteaKeywords}
+                placeholder="es. LEUC CORDIF, CORDIFOLIUM, L.CORD"
+                placeholderTextColor={theme.textSecondary}
+              />
+              <ThemedText style={{ fontSize: 11, color: theme.textSecondary, marginTop: Spacing.xs }}>
+                Parole che compaiono nelle fatture per identificare questa varieta
+              </ThemedText>
+            </View>
+
+            <Spacer height={Spacing.lg} />
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.saveButton,
+                {
+                  backgroundColor: '#4CAF50',
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+              onPress={handleAddProteaRule}
+            >
+              <Feather name="plus" size={20} color="#FFFFFF" />
+              <ThemedText style={styles.saveButtonText}>
+                Aggiungi Varieta
+              </ThemedText>
+            </Pressable>
+          </View>
+
+          {proteaRules.length > 0 ? (
+            <View style={[styles.debugCard, { backgroundColor: theme.backgroundDefault, marginTop: Spacing.lg }]}>
+              <ThemedText style={{ fontWeight: '600', fontSize: 16, marginBottom: Spacing.md }}>
+                Varieta Configurate ({proteaRules.length})
+              </ThemedText>
+
+              {proteaRules.map(rule => (
+                <View 
+                  key={rule.id} 
+                  style={[
+                    styles.ruleItem,
+                    { borderBottomColor: theme.backgroundSecondary },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                      <View style={[styles.categoryChip, { backgroundColor: PROTEA_GENUS_CONFIG[rule.genus]?.color || '#607D8B' }]}>
+                        <ThemedText style={{ fontSize: 10, color: '#FFFFFF' }}>
+                          {rule.genus}
+                        </ThemedText>
+                      </View>
+                      <ThemedText style={{ fontWeight: '600' }}>
+                        {rule.scientificName}
+                      </ThemedText>
+                    </View>
+                    {rule.tradeName ? (
+                      <ThemedText style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>
+                        Nome comm.: {rule.tradeName}
+                      </ThemedText>
+                    ) : null}
+                    <ThemedText style={{ fontSize: 11, color: theme.textSecondary, marginTop: 2 }}>
+                      Keywords: {rule.keywords.join(', ')}
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    onPress={() => handleDeleteProteaRule(rule.id, rule.scientificName)}
+                    style={{ padding: Spacing.sm }}
+                  >
+                    <Feather name="trash-2" size={18} color={theme.error} />
+                  </Pressable>
+                </View>
+              ))}
             </View>
           ) : null}
         </View>

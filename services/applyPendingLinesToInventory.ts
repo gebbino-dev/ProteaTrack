@@ -109,15 +109,27 @@ export async function applyPendingLinesToPlantInventory(): Promise<{
  * Processa una singola riga fattura di pianta o seme.
  * Funzione interna usata da applyPendingLinesToPlantInventory.
  * 
- * Se la riga ha forcedVariety o forcedSpecies (da regola utente),
- * usa quelli invece di estrarre dalla descrizione.
+ * PRIORITÀ per la varietà:
+ * 1. forcedVariety (da regola utente UserCategorizationRule)
+ * 2. matchedVariety (da dizionario ProteaVarietyRule)
+ * 3. extractVarietyFromDescription (estrazione automatica)
+ * 
+ * PRIORITÀ per la specie:
+ * 1. forcedSpecies (da regola utente)
+ * 2. matchedGenus (da dizionario proteacee)
+ * 3. Prima parola della varietà
  */
 async function processPlantLine(line: PendingInvoiceLine, itemType: 'pianta' | 'seme'): Promise<void> {
   const extractedVariety = extractVarietyFromDescription(line.description);
   
-  const rawVariety = line.forcedVariety || extractedVariety;
+  const rawVariety = line.forcedVariety || line.matchedVariety || extractedVariety;
   const variety = itemType === 'seme' ? `[Semi] ${rawVariety}` : rawVariety;
-  const species = line.forcedSpecies || rawVariety.split(' ')[0] || rawVariety;
+  
+  const species = line.forcedSpecies || 
+                  line.matchedGenus || 
+                  rawVariety.split(' ')[0] || 
+                  rawVariety;
+  
   const sourceDoc = `FT ${line.invoiceNumber} del ${line.invoiceDate}`;
   const cycleKey = calculateCycleKey(rawVariety, line.invoiceDate);
 
@@ -129,6 +141,9 @@ async function processPlantLine(line: PendingInvoiceLine, itemType: 'pianta' | '
     cycleKey,
     usedForcedVariety: !!line.forcedVariety,
     usedForcedSpecies: !!line.forcedSpecies,
+    usedMatchedVariety: !!line.matchedVariety,
+    usedMatchedGenus: !!line.matchedGenus,
+    matchedRuleId: line.matchedRuleId,
   });
 
   const savedRecord = await storage.savePlantRecord({
@@ -141,6 +156,7 @@ async function processPlantLine(line: PendingInvoiceLine, itemType: 'pianta' | '
       ? `SEMI. Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`
       : `Fornitore: ${line.supplierName}. Prezzo: ${line.unitPrice.toFixed(2)} EUR/${line.unitOfMeasure || 'pz'}`,
     cycleKey: cycleKey ?? undefined,
+    matchedRuleId: line.matchedRuleId,
   });
 
   console.log(`[DEBUG] Plant record saved successfully:`, savedRecord);
