@@ -184,22 +184,37 @@ export const storage = {
 
   async getStats(): Promise<{
     totalPlants: number;
+    totalPlantsInventory: number;
+    totalPlantsBenches: number;
     todayActivities: number;
     recentActivities: Activity[];
     benchesWithPlants: number;
   }> {
-    const [benches, activities] = await Promise.all([
+    const [benches, activities, plantInventory] = await Promise.all([
       this.getBenches(),
       this.getActivities(),
+      this.getPlantInventory(),
     ]);
 
     const today = new Date().toISOString().split('T')[0];
     const todayActivities = activities.filter(a => a.date.startsWith(today));
-    const totalPlants = benches.reduce((sum, b) => sum + b.plantCount, 0);
+    
+    const totalPlantsInventory = plantInventory.plants.reduce(
+      (sum, p) => sum + (p.quantity || 0),
+      0
+    );
+    const totalPlantsBenches = benches.reduce((sum, b) => sum + b.plantCount, 0);
     const benchesWithPlants = benches.filter(b => b.plantCount > 0).length;
 
+    console.log('STATS DEBUG', {
+      totalPlantsInventory,
+      totalPlantsBenches,
+    });
+
     return {
-      totalPlants,
+      totalPlants: totalPlantsInventory + totalPlantsBenches,
+      totalPlantsInventory,
+      totalPlantsBenches,
       todayActivities: todayActivities.length,
       recentActivities: activities.slice(0, 10),
       benchesWithPlants,

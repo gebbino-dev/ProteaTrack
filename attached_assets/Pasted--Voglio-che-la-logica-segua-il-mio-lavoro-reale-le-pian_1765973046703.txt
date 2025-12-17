@@ -1,0 +1,86 @@
+
+Voglio che la logica segua il mio lavoro reale:
+
+- le piantine **arrivano da fattura** → finiscono in **Vivaio** (magazzino piante),  
+- solo dopo, quando le invaso, le sposto sui **bancali** nelle serre.  
+
+Per ora tutte le piante nuove possono essere considerate “in Vivaio” fino a quando non le assegnerò ai bancali.
+
+### 1. Aggiornare getStats (Opzione A + Vivaio)
+
+Nel file `utils/storage.ts` modifica `getStats` così:
+
+1. Importa anche l’inventario piante:
+
+```ts
+async getStats(): Promise<{
+  totalPlants: number;
+  todayActivities: number;
+  recentActivities: Activity[];
+  benchesWithPlants: number;
+}> {
+  const [benches, activities, plantInventory] = await Promise.all([
+    this.getBenches(),
+    this.getActivities(),
+    this.getPlantInventory(),   // <‑‑ aggiunto
+  ]);
+
+  const today = new Date().toISOString().split('T')[0];
+  const todayActivities = activities.filter(a => a.date.startsWith(today));
+
+  const benchesWithPlants = benches.filter(b => b.plantCount > 0).length;
+
+  // Piante totali = piante in Vivaio (inventario) + piante già su bancali
+  const totalPlantsInventory = plantInventory.plants.reduce(
+    (sum, p) => sum + (p.quantity || 0),
+    0
+  );
+  const totalPlantsBenches = benches.reduce((sum, b) => sum + b.plantCount, 0);
+
+  return {
+    totalPlants: totalPlantsInventory + totalPlantsBenches,
+    todayActivities: todayActivities.length,
+    recentActivities: activities.slice(0, 10),
+    benchesWithPlants,
+  };
+}
+```
+
+In questo modo la `DashboardScreen` continua a usare `stats.totalPlants`, ma ora riflette anche tutte le piantine arrivate da fattura (Vivaio).
+
+### 2. Concetto di “Vivaio” (Serra 2, primi 3 settori)
+
+Per adesso NON cambiare la struttura dei bancali, ma considera:
+
+- tutte le piante in `PlantInventory` come **“in Vivaio”** finché non le sposto manualmente su un bancale.  
+- più avanti potremo:
+  - aggiungere un campo `location` o `benchRef` a `PlantRecord`,  
+  - creare una schermata “Sposta da Vivaio a Bancali” che:
+    - sottrae quantità dal lotto in Vivaio,
+    - aggiunge `plantCount` sui bancali reali.
+
+Per il momento è sufficiente che:
+
+- le piante importate da fattura vadano in `PlantInventory` (già fatto con `applyPendingLinesToPlantInventory`),  
+- `getStats().totalPlants` le conti sempre, anche se non sono ancora sui bancali.
+
+### 3. Da verificare
+
+Dopo la modifica:
+
+1. Importo una fattura con piante.  
+2. Eseguo l’azione che chiama `applyPendingLinesToPlantInventory`.  
+3. Apro:
+   - “Colture → Piante disponibili” (deve mostrare le quantità per genere/varietà),  
+   - “Gestione e Report” → “Piante Totali” (deve mostrare lo stesso totale o molto vicino).
+
+Se serve log, stampa momentaneamente in `getStats`:
+
+```ts
+console.log('STATS DEBUG', {
+  totalPlantsInventory,
+  totalPlantsBenches,
+});
+```
+
+così vedo da console Replit quanto viene da Vivaio (inventario) e quanto da bancali 

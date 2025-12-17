@@ -46,6 +46,12 @@ Each `PlantRecord` serves as the complete identity for a plant lot with:
 -   `benchRef` (optional link to bench for future distribution)
 -   `matchedRuleId` (optional: ID of ProteaVarietyRule that identified this variety)
 
+### Vivaio Concept
+-   Plants arrive from invoices → go to PlantInventory ("Vivaio")
+-   Plants in PlantInventory are considered "in Vivaio" until manually assigned to benches
+-   `getStats().totalPlants` = `totalPlantsInventory` (Vivaio) + `totalPlantsBenches` (sui bancali)
+-   Future: `benchRef` field will track movement from Vivaio to specific benches
+
 ### Unified Calendar System (EventAggregator)
 Displays aggregated events from all modules: Activities, Treatments, Transactions, and Plant Arrivals, each with distinct colors and icons.
 
